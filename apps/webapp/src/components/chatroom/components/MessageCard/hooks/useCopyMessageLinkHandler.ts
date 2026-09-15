@@ -25,11 +25,7 @@ export const useCopyMessageLinkHandler = () => {
   }, [])
 
   const copyMessageLinkHandler = useCallback(
-    (message: TMsgRow) => {
-      if (!message) return
-      const url = getMessageUrl(message)
-      copy(url)
-    },
+    (message: TMsgRow) => copy(getMessageUrl(message)),
     [copy, getMessageUrl]
   )
 

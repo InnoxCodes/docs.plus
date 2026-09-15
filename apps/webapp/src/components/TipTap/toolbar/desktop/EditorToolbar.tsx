@@ -309,11 +309,10 @@ const EditorToolbar = () => {
             onClick={copyDocumentToClipboard}
             tooltip={copyDocumentTooltip}
             aria-label={copyDocumentTooltip}>
-            {copied ? (
-              <Icons.check size={ICON_SIZE} className="text-success" />
-            ) : (
-              <Icons.copy size={ICON_SIZE} />
-            )}
+            <span className={`swap ${copied ? 'swap-active' : ''}`} aria-hidden>
+              <Icons.check size={ICON_SIZE} className="swap-on text-success stroke-[1.75]" />
+              <Icons.copy size={ICON_SIZE} className="swap-off stroke-[1.75]" />
+            </span>
           </ToolbarButton>
 
           {isAuthServiceAvailable && user && (

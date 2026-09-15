@@ -129,6 +129,7 @@ const ShareModal = ({ setIsOpen }: ShareModalProps) => {
             <div className="flex shrink-0 gap-1">
               {hasWebShare && (
                 <button
+                  type="button"
                   onClick={webShareAPI}
                   title="More sharing options"
                   className="btn btn-ghost btn-sm btn-square text-base-content/50 hover:text-base-content">
@@ -136,22 +137,19 @@ const ShareModal = ({ setIsOpen }: ShareModalProps) => {
                 </button>
               )}
               <button
+                type="button"
                 onClick={() => copy(href)}
-                className={`btn btn-sm gap-1.5 px-4 font-medium ${copied ? 'btn-success' : 'btn-primary'}`}>
-                <span
-                  key={copied ? 'copied' : 'copy'}
-                  className="flex items-center gap-1.5 motion-safe:animate-[doc-region-in_120ms_ease-out_both]">
-                  {copied ? (
-                    <>
-                      <Icons.check size={16} />
-                      Copied
-                    </>
-                  ) : (
-                    <>
-                      <Icons.copy size={14} />
-                      Copy
-                    </>
-                  )}
+                aria-label={copied ? 'Copied' : 'Copy link'}
+                className={`btn btn-sm px-4 font-medium ${copied ? 'btn-success' : 'btn-primary'}`}>
+                <span className={`swap ${copied ? 'swap-active' : ''}`} aria-hidden>
+                  <span className="swap-on flex items-center gap-1.5">
+                    <Icons.check size={16} />
+                    Copied
+                  </span>
+                  <span className="swap-off flex items-center gap-1.5">
+                    <Icons.copy size={14} />
+                    Copy
+                  </span>
                 </span>
               </button>
             </div>

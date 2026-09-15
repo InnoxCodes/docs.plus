@@ -2,9 +2,10 @@ import { Icons } from '@components/icons/registry'
 import { InternalLinkChip } from '@components/TipTap/hyperlinkPopovers/components/InternalLinkChip'
 import { classifyInternalDocumentLink } from '@components/TipTap/hyperlinkPopovers/internalDocumentLink'
 import { runInternalDocumentLink } from '@components/TipTap/hyperlinkPopovers/internalDocumentLinkActions'
+import useCopyToClipboard from '@hooks/useCopyToClipboard'
 import { useStore } from '@stores'
-import { copyToClipboard } from '@utils/clipboard'
 import { useId, useMemo } from 'react'
+import { twMerge } from 'tailwind-merge'
 
 import { ComposerLinkModalShell } from './ComposerLinkModalShell'
 
@@ -23,10 +24,10 @@ export function ComposerLinkPreviewDialog({ href, onEdit, onRemove, onClose }: P
     [href]
   )
 
-  const handleCopy = async () => {
-    const ok = await copyToClipboard(href)
-    if (!ok) console.error('Failed to copy link to clipboard')
-  }
+  const { copy, copied } = useCopyToClipboard({
+    successMessage: null,
+    errorMessage: 'Failed to copy link'
+  })
 
   const handleGo = () => {
     if (!internalLink) return
@@ -60,10 +61,14 @@ export function ComposerLinkPreviewDialog({ href, onEdit, onRemove, onClose }: P
           )}
           <button
             type="button"
-            className="btn btn-ghost justify-start"
-            onClick={() => void handleCopy()}
+            className={twMerge('btn btn-ghost justify-start', copied && 'text-success')}
+            onClick={() => void copy(href)}
+            aria-label={copied ? 'Copied!' : 'Copy link'}
             data-testid="composer-link-preview-copy">
-            Copy link
+            <span className={twMerge('swap', copied && 'swap-active')} aria-hidden>
+              <span className="swap-on">Copied!</span>
+              <span className="swap-off">Copy link</span>
+            </span>
           </button>
           <button
             type="button"

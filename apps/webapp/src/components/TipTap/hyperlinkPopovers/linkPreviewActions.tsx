@@ -1,4 +1,5 @@
 import { Icons } from '@components/icons/registry'
+import * as toast from '@components/toast'
 import { copyToClipboard } from '@docs.plus/extension-hyperlink'
 import type { SheetDataMap } from '@stores'
 import { useSheetStore } from '@stores'
@@ -24,12 +25,14 @@ type BuildLinkPreviewActionsArgs = {
   payload: SheetDataMap['linkPreview']
   closeSheet: () => void
   switchSheet: ReturnType<typeof useSheetStore.getState>['switchSheet']
+  onCopySuccess: () => void
 }
 
 export function buildLinkPreviewActions({
   payload,
   closeSheet,
-  switchSheet
+  switchSheet,
+  onCopySuccess
 }: BuildLinkPreviewActionsArgs): LinkPreviewAction[] {
   const { href, editor, nodePos, attrs, isAllowedUri } = payload
   const internalLink = classifyInternalDocumentLink(href, window.location.pathname)
@@ -57,8 +60,8 @@ export function buildLinkPreviewActions({
       icon: <Icons.copy size={ICON_SIZE} />,
       onClick: () => {
         copyToClipboard(href, (ok) => {
-          if (ok) closeSheet()
-          else console.error('Failed to copy to clipboard')
+          if (ok) onCopySuccess()
+          else toast.Error('Failed to copy to clipboard')
         })
       }
     },

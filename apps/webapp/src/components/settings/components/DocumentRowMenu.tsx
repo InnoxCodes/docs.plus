@@ -6,11 +6,13 @@ import {
 } from '@components/ui/ContextMenu'
 import { Popover, PopoverContent, PopoverTrigger, usePopoverState } from '@components/ui/Popover'
 import Toggle from '@components/ui/Toggle'
+import { useCloseAfterHold } from '@hooks/useCloseAfterHold'
+import useCopyToClipboard from '@hooks/useCopyToClipboard'
 import { useDocumentAccessMutation } from '@hooks/useDocumentAccessMutation'
 import { useStore } from '@stores'
-import { copyToClipboard } from '@utils/clipboard'
 import { useEffect, useRef, useState } from 'react'
 import {
+  LuCheck,
   LuCopy,
   LuEllipsisVertical,
   LuExternalLink,
@@ -21,6 +23,7 @@ import {
   LuStar,
   LuTrash2
 } from 'react-icons/lu'
+import { twMerge } from 'tailwind-merge'
 
 import type { DocumentsListScope } from '../documentsQueryKey'
 import { useOwnerDocumentsCache } from '../hooks/documentsCache'
@@ -61,26 +64,38 @@ function RowMenuItems({
   })
 
   const label = title ?? slug
+  const { schedule, cancel } = useCloseAfterHold(close)
+  const { copy, copied } = useCopyToClipboard({
+    successMessage: 'Link copied!',
+    errorMessage: 'Couldn’t copy link',
+    onSuccess: schedule
+  })
+
+  const closeNow = () => {
+    cancel()
+    close()
+  }
 
   const openInNewTab = () => {
     window.open(`/${slug}`, '_blank')
-    close()
+    closeNow()
   }
 
   const startRename = () => {
     onRename?.()
-    close()
+    closeNow()
   }
 
   // detail === 0 means the click came from Enter/Space (keyboard), not a pointer.
   const removeDocument = (e: React.MouseEvent) => {
     onDelete?.(e.detail === 0)
-    close()
+    closeNow()
   }
 
   // Additive post-confirm write — no cancel/snapshot/rollback (nothing to undo).
   // Menu stays open (mirrors patch) so this mutate-scoped onSuccess isn't dropped.
   const runDuplicate = () => {
+    cancel()
     const toastId = toast.Loading('Duplicating…')
     duplicate(
       { documentId },
@@ -99,6 +114,7 @@ function RowMenuItems({
   }
 
   const runToggleFavorite = () => {
+    cancel()
     const next = !isFavorite
     void cache.setFavorite(documentId, next).then((rollback) => {
       toggleFavorite(
@@ -113,13 +129,6 @@ function RowMenuItems({
     })
   }
 
-  const copyLink = async () => {
-    const ok = await copyToClipboard(`${window.location.origin}/${slug}`)
-    if (ok) toast.Success('Link copied!')
-    else toast.Error('Couldn’t copy link')
-    close()
-  }
-
   return (
     <>
       <button type="button" className="rounded-field group w-full text-left" onClick={openInNewTab}>
@@ -129,9 +138,23 @@ function RowMenuItems({
       </button>
 
       {!isPrivate && (
-        <button type="button" className="rounded-field group w-full text-left" onClick={copyLink}>
-          <ContextMenuRow icon={<LuLink size={16} />} className={rowClassName}>
-            Copy link
+        <button
+          type="button"
+          className="rounded-field group w-full text-left"
+          onClick={() => void copy(`${window.location.origin}/${slug}`)}
+          aria-label={copied ? 'Copied!' : 'Copy link'}>
+          <ContextMenuRow
+            icon={
+              <span className={twMerge('swap', copied && 'swap-active')} aria-hidden>
+                <LuCheck size={16} className="swap-on text-success" />
+                <LuLink size={16} className="swap-off" />
+              </span>
+            }
+            className={twMerge(rowClassName, copied && 'text-success')}>
+            <span className={twMerge('swap', copied && 'swap-active')} aria-hidden>
+              <span className="swap-on">Copied!</span>
+              <span className="swap-off">Copy link</span>
+            </span>
           </ContextMenuRow>
         </button>
       )}
@@ -180,7 +203,10 @@ function RowMenuItems({
           className="shrink-0"
           checked={isPrivate}
           disabled={isControlDisabled('isPrivate')}
-          onChange={(e) => setPrivate(e.target.checked)}
+          onChange={(e) => {
+            cancel()
+            setPrivate(e.target.checked)
+          }}
           aria-label={`Make “${label}” private`}
         />
       </div>
@@ -203,7 +229,10 @@ function RowMenuItems({
           className="shrink-0"
           checked={readOnly}
           disabled={isControlDisabled('readOnly')}
-          onChange={(e) => setReadOnly(e.target.checked)}
+          onChange={(e) => {
+            cancel()
+            setReadOnly(e.target.checked)
+          }}
           aria-label={`Make “${label}” read-only`}
         />
       </div>

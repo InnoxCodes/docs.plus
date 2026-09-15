@@ -15,18 +15,18 @@ export const CopyLinkAction = ({ className }: Props) => {
 
   return (
     <li className={twMerge('border-base-300', className)}>
-      <a className="flex items-center gap-2" onClick={() => copyMessageLinkHandler(message)}>
-        {copied ? (
-          <>
-            <Icons.check size={18} className="text-success" />
-            <span className="text-success">Copied!</span>
-          </>
-        ) : (
-          <>
-            <Icons.link size={18} />
-            Copy Link
-          </>
-        )}
+      <a
+        className={twMerge('flex items-center gap-2', copied && 'text-success')}
+        aria-label={copied ? 'Copied!' : 'Copy Link'}
+        onClick={() => copyMessageLinkHandler(message)}>
+        <span className={twMerge('swap', copied && 'swap-active')} aria-hidden>
+          <Icons.check size={18} className="swap-on text-success" />
+          <Icons.link size={18} className="swap-off" />
+        </span>
+        <span className={twMerge('swap', copied && 'swap-active')} aria-hidden>
+          <span className="swap-on">Copied!</span>
+          <span className="swap-off">Copy Link</span>
+        </span>
       </a>
     </li>
   )

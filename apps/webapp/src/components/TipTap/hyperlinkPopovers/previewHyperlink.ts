@@ -1,4 +1,5 @@
 import { Icons } from '@components/icons/registry'
+import * as toast from '@components/toast'
 import {
   copyToClipboard,
   createHTMLElement,
@@ -8,6 +9,7 @@ import {
 } from '@docs.plus/extension-hyperlink'
 import { useSheetStore, useStore } from '@stores'
 import type { Editor } from '@tiptap/core'
+import { COPY_FADE_HOLD_MS, prefersReducedMotion } from '@utils/motion'
 
 import { classifyInternalDocumentLink } from './internalDocumentLink'
 import {
@@ -105,7 +107,7 @@ const buildDesktopPopover = (
     className: 'copy',
     title: 'Copy link',
     ariaLabel: 'Copy link',
-    innerHTML: renderIconMarkup(Icons.copy, 18)
+    innerHTML: `<span class="swap" aria-hidden><span class="swap-on">${renderIconMarkup(Icons.check, 18, 'text-success')}</span><span class="swap-off">${renderIconMarkup(Icons.copy, 18)}</span></span>`
   })
   const editButton = createHTMLElement('button', {
     className: 'edit',
@@ -122,8 +124,23 @@ const buildDesktopPopover = (
 
   copyButton.addEventListener('click', () => {
     copyToClipboard(href, (success) => {
-      if (success) getDefaultController().close()
-      else console.error('Failed to copy to clipboard')
+      if (ctx.signal.aborted) return
+      if (!success) {
+        toast.Error('Failed to copy to clipboard')
+        return
+      }
+      copyButton.querySelector('.swap')?.classList.add('swap-active')
+      copyButton.setAttribute('aria-label', 'Copied!')
+      copyButton.title = 'Copied!'
+      if (prefersReducedMotion()) {
+        getDefaultController().close()
+        return
+      }
+      const timer = window.setTimeout(() => {
+        if (ctx.signal.aborted) return
+        getDefaultController().close()
+      }, COPY_FADE_HOLD_MS)
+      ctx.signal.addEventListener('abort', () => window.clearTimeout(timer), { once: true })
     })
   })
 

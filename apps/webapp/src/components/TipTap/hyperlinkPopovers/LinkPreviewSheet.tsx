@@ -1,7 +1,9 @@
 import { SheetLayout } from '@components/SheetLayout'
+import { useCloseAfterHold } from '@hooks/useCloseAfterHold'
+import { Icons } from '@icons'
 import { type SheetDataMap, useSheetStore } from '@stores'
 import { sheetBodyPadClassName } from '@utils/sheetBodyPadding'
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { twMerge } from 'tailwind-merge'
 
 import { InternalLinkChip } from './components/InternalLinkChip'
@@ -82,13 +84,20 @@ const LinkPreviewSheet = ({ data: payload }: LinkPreviewSheetProps) => {
   const closeSheet = useSheetStore((s) => s.closeSheet)
   const switchSheet = useSheetStore((s) => s.switchSheet)
   const { href, editor } = payload
+  const [copied, setCopied] = useState(false)
+  const { schedule, cancel } = useCloseAfterHold(closeSheet)
+
+  const onCopySuccess = () => {
+    setCopied(true)
+    schedule()
+  }
 
   const internalLink = useMemo(
     () => classifyInternalDocumentLink(href, window.location.pathname),
     [href]
   )
 
-  const actions = buildLinkPreviewActions({ payload, closeSheet, switchSheet })
+  const actions = buildLinkPreviewActions({ payload, closeSheet, switchSheet, onCopySuccess })
 
   return (
     <SheetLayout title="Link" onClose={closeSheet}>
@@ -101,27 +110,49 @@ const LinkPreviewSheet = ({ data: payload }: LinkPreviewSheetProps) => {
           )}
         </div>
         <ul className="flex flex-col pt-1">
-          {actions.map((action) => (
-            <li key={action.key}>
-              <button
-                type="button"
-                onClick={action.onClick}
-                data-testid={`hyperlink-preview-${action.key}`}
-                className={twMerge(
-                  'group hover:bg-base-200 active:bg-base-200 text-base-content rounded-field flex min-h-12 w-full items-center gap-3 py-2.5 text-left text-base transition-colors',
-                  action.danger && 'hover:text-error active:text-error'
-                )}>
-                <span
+          {actions.map((action) => {
+            const isCopy = action.key === 'copy'
+            return (
+              <li key={action.key}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!isCopy) cancel()
+                    action.onClick()
+                  }}
+                  aria-label={isCopy ? (copied ? 'Copied!' : action.label) : undefined}
+                  data-testid={`hyperlink-preview-${action.key}`}
                   className={twMerge(
-                    'text-base-content/70 inline-flex size-6 shrink-0 items-center justify-center',
-                    action.danger && 'group-hover:text-error group-active:text-error'
+                    'group hover:bg-base-200 active:bg-base-200 text-base-content rounded-field flex min-h-12 w-full items-center gap-3 py-2.5 text-left text-base transition-colors',
+                    action.danger && 'hover:text-error active:text-error',
+                    isCopy && copied && 'text-success'
                   )}>
-                  {action.icon}
-                </span>
-                <span className="flex-1">{action.label}</span>
-              </button>
-            </li>
-          ))}
+                  <span
+                    className={twMerge(
+                      'text-base-content/70 inline-flex size-6 shrink-0 items-center justify-center',
+                      action.danger && 'group-hover:text-error group-active:text-error'
+                    )}>
+                    {isCopy ? (
+                      <span className={twMerge('swap', copied && 'swap-active')} aria-hidden>
+                        <Icons.check size={20} className="swap-on text-success" />
+                        <span className="swap-off inline-flex">{action.icon}</span>
+                      </span>
+                    ) : (
+                      action.icon
+                    )}
+                  </span>
+                  {isCopy ? (
+                    <span className={twMerge('swap flex-1', copied && 'swap-active')} aria-hidden>
+                      <span className="swap-on">Copied!</span>
+                      <span className="swap-off">{action.label}</span>
+                    </span>
+                  ) : (
+                    <span className="flex-1">{action.label}</span>
+                  )}
+                </button>
+              </li>
+            )
+          })}
         </ul>
       </div>
     </SheetLayout>

@@ -77,8 +77,8 @@ export interface PreviewContext {
   signal: AbortSignal
 }
 
-export const renderIconMarkup = (Icon: IconType, size = 20): string =>
-  renderToStaticMarkup(createElement(Icon, { size, 'aria-hidden': true }))
+export const renderIconMarkup = (Icon: IconType, size = 20, className?: string): string =>
+  renderToStaticMarkup(createElement(Icon, { size, className, 'aria-hidden': true }))
 
 // Render a Lucide React icon into the imperative-DOM popover container.
 // `aria-hidden` because the metadata title link alongside is the

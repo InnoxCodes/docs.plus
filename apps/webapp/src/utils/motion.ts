@@ -4,6 +4,8 @@ export const MOTION_OVERLAY_OUT_MS = 80
 export const MOTION_PANEL_MS = 200
 export const MOTION_DIALOG_IN_MS = 180
 export const MOTION_DIALOG_OUT_MS = 150
+/** Hold a closing surface so daisyUI `swap` can finish (panel × 2). */
+export const COPY_FADE_HOLD_MS = MOTION_PANEL_MS * 2
 
 // framer-motion tween for in-page panels (ComposerEmojiPanel outer-height pattern).
 export const PANEL_TWEEN = { duration: 0.2, ease: 'easeOut' } as const

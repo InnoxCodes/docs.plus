@@ -1,9 +1,9 @@
 import { useMediaDisplayUrl } from '@components/chatroom/hooks/useMediaSignedUrl'
 import { parseMessageMedias } from '@components/chatroom/utils/messageMediaPaths'
 import { PanelFeedItem } from '@components/PanelFeedItem'
-import * as toast from '@components/toast'
 import { Avatar } from '@components/ui/Avatar'
 import Button from '@components/ui/Button'
+import useCopyToClipboard from '@hooks/useCopyToClipboard'
 import { useDismissPanel } from '@hooks/useDismissPanel'
 import { Icons } from '@icons'
 import { CHAT_OPEN } from '@services/eventsHub'
@@ -77,6 +77,10 @@ export const BookmarkItem = ({ bookmark, variant = 'popover' }: BookmarkItemProp
   const destroyChatRoom = useChatStore((state) => state.destroyChatRoom)
   const dismissPanel = useDismissPanel(variant)
   const { remove, markAsRead, archive, isExiting } = useBookmarkPanelActions()
+  const { copy, copied } = useCopyToClipboard({
+    successMessage: 'URL copied to clipboard',
+    errorMessage: 'Failed to copy URL'
+  })
 
   const exiting = isExiting(bookmark.bookmark_id)
 
@@ -101,16 +105,7 @@ export const BookmarkItem = ({ bookmark, variant = 'popover' }: BookmarkItemProp
       messageId: bookmark.message_id,
       channelId: bookmark.message_channel_id
     })
-
-    navigator.clipboard
-      .writeText(href)
-      .then(() => {
-        toast.Success('URL copied to clipboard')
-      })
-      .catch((err) => {
-        console.error('Failed to copy URL:', err)
-        toast.Error('Failed to copy URL')
-      })
+    void copy(href)
   }
 
   const medias = parseMessageMedias(bookmark.message_medias)
@@ -148,8 +143,11 @@ export const BookmarkItem = ({ bookmark, variant = 'popover' }: BookmarkItemProp
             className="text-base-content/50 hover:text-base-content shrink-0"
             onClick={() => handleCopyUrl(bookmark)}
             disabled={exiting}
-            aria-label="Copy link">
-            <LuLink size={14} className="rotate-45" />
+            aria-label={copied ? 'Copied!' : 'Copy link'}>
+            <span className={`swap ${copied ? 'swap-active' : ''}`} aria-hidden>
+              <Icons.check size={14} className="swap-on text-success" />
+              <LuLink size={14} className="swap-off rotate-45" />
+            </span>
           </Button>
         </div>
 

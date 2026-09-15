@@ -63,6 +63,7 @@ export const useNotificationToggle = () => {
   return {
     notificationState,
     loading: fetchLoading || updateLoading,
+    fetchLoading,
     error: fetchError || updateError,
     handleToggle
   }

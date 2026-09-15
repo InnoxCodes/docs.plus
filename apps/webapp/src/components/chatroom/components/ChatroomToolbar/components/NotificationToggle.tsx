@@ -11,6 +11,8 @@ type Props = {
   iconSize?: number
 }
 
+const notificationStates = ['ALL', 'MENTIONS', 'MUTED'] as const
+
 const notificationConfig = {
   ALL: {
     icon: Icons.notifications,
@@ -31,19 +33,20 @@ export const NotificationToggle = ({ className, size = 'sm', iconSize }: Props) 
   // channel_members row for them. Hide the toggle entirely rather than
   // showing a button that 401s on click.
   const profile = useAuthStore((state) => state.profile)
-  const { notificationState, loading, handleToggle } = useNotificationToggle()
+  const { notificationState, loading, fetchLoading, handleToggle } = useNotificationToggle()
 
   if (!profile?.id) return null
 
   const config = notificationConfig[notificationState]
-  const Icon = config.icon
+  const resolvedIconSize = iconSize ?? (size === 'xs' ? 14 : 16)
 
   return (
     <Button
       variant="ghost"
       size={size}
       shape="square"
-      loading={loading}
+      loading={fetchLoading}
+      disabled={loading}
       onClick={handleToggle}
       title={config.label}
       className={twMerge(
@@ -51,7 +54,21 @@ export const NotificationToggle = ({ className, size = 'sm', iconSize }: Props) 
         className
       )}
       aria-label={`Notifications: ${config.label}`}>
-      <Icon size={iconSize ?? (size === 'xs' ? 14 : 16)} className="stroke-[1.75]" />
+      <span className="inline-grid place-content-center" aria-hidden>
+        {notificationStates.map((state) => {
+          const StateIcon = notificationConfig[state].icon
+          return (
+            <StateIcon
+              key={state}
+              size={resolvedIconSize}
+              className={twMerge(
+                'col-start-1 row-start-1 stroke-[1.75] motion-safe:transition-opacity motion-safe:duration-[var(--motion-panel)] motion-safe:ease-[var(--motion-ease-enter)]',
+                notificationState === state ? 'opacity-100' : 'opacity-0'
+              )}
+            />
+          )
+        })}
+      </span>
     </Button>
   )
 }

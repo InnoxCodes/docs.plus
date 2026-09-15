@@ -316,7 +316,8 @@ $pad-toolbar-height: 38px;
       color: var(--color-error);
     }
 
-    > svg {
+    > svg,
+    .swap svg {
       width: 18px;
       height: 18px;
     }

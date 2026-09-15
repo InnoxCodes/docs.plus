@@ -19,10 +19,24 @@ import { hasMetadataProperty } from '@utils/metadata'
 import { openReportMail } from '@utils/reportContent'
 import React, { useMemo } from 'react'
 
+export type MessageActionMenuItemId =
+  | 'reply'
+  | 'add-reaction'
+  | 'copy-link'
+  | 'download'
+  | 'bookmark'
+  | 'copy-to-doc'
+  | 'reply-in-thread'
+  | 'pin'
+  | 'edit'
+  | 'delete'
+  | 'report'
+
 export type MessageActionMenuItem = {
+  id: MessageActionMenuItemId
   title: string
   icon: React.ReactNode
-  onClickFn: (e?: React.MouseEvent) => void
+  onClickFn: (e?: React.MouseEvent) => void | Promise<void | boolean>
   display: boolean
   variant?: ContextMenuRowVariant
   separatorBefore?: boolean
@@ -56,6 +70,7 @@ export const useMessageActionMenuItems = (
   const items = useMemo(() => {
     const list: MessageActionMenuItem[] = [
       {
+        id: 'reply',
         title: 'Reply',
         icon: <Icons.reply size={iconSize} />,
         onClickFn: () => replyInMessageHandler(message),
@@ -65,6 +80,7 @@ export const useMessageActionMenuItems = (
 
     if (includeReaction) {
       list.push({
+        id: 'add-reaction',
         title: 'Add reaction',
         icon: <Icons.emoji size={iconSize} />,
         onClickFn: (e?: React.MouseEvent) => {
@@ -81,21 +97,16 @@ export const useMessageActionMenuItems = (
     }
 
     list.push({
-      title: linkCopied ? 'Copied!' : attachmentCount > 0 ? 'Share message link' : 'Copy Link',
-      icon: linkCopied ? (
-        <Icons.check size={iconSize} className="text-success" />
-      ) : attachmentCount > 0 ? (
-        <Icons.share size={iconSize} />
-      ) : (
-        <Icons.link size={iconSize} />
-      ),
+      id: 'copy-link',
+      title: attachmentCount > 0 ? 'Share message link' : 'Copy Link',
+      icon: attachmentCount > 0 ? <Icons.share size={iconSize} /> : <Icons.link size={iconSize} />,
       onClickFn: () => copyMessageLinkHandler(message),
-      display: true,
-      className: linkCopied ? 'text-success' : undefined
+      display: true
     })
 
     if (attachmentCount > 0) {
       list.push({
+        id: 'download',
         title: attachmentCount > 1 ? `Download all (${attachmentCount})` : 'Download',
         icon: <Icons.download size={iconSize} />,
         onClickFn: () => downloadMessageMediaHandler(message),
@@ -105,6 +116,7 @@ export const useMessageActionMenuItems = (
 
     list.push(
       {
+        id: 'bookmark',
         title: 'Bookmark',
         icon:
           message.is_bookmarked || message.bookmark_id ? (
@@ -117,12 +129,14 @@ export const useMessageActionMenuItems = (
         separatorBefore: true
       },
       {
+        id: 'copy-to-doc',
         title: 'Copy to Doc',
         icon: <Icons.fileOpen size={iconSize} />,
         onClickFn: () => copyMessageToDocHandler(message),
         display: true
       },
       {
+        id: 'reply-in-thread',
         title: 'Reply in Thread',
         icon: <Icons.thread size={iconSize} />,
         onClickFn: () => replyInThreadHandler(message),
@@ -130,12 +144,14 @@ export const useMessageActionMenuItems = (
         variant: 'primary'
       },
       {
+        id: 'pin',
         title: isPinned ? 'Unpin' : 'Pin',
         icon: isPinned ? <Icons.pinOff size={iconSize} /> : <Icons.pin size={iconSize} />,
         onClickFn: () => pinMessageHandler(message),
         display: false
       },
       {
+        id: 'edit',
         title: 'Edit',
         icon: <Icons.edit size={iconSize} />,
         onClickFn: () => editMessageHandler(message),
@@ -143,6 +159,7 @@ export const useMessageActionMenuItems = (
         separatorBefore: true
       },
       {
+        id: 'delete',
         title: 'Delete',
         icon: <Icons.trash size={iconSize} />,
         onClickFn: () => {
@@ -156,6 +173,7 @@ export const useMessageActionMenuItems = (
       {
         // Deliberately not hidden on your own messages: OSA s.20 wants the route
         // open to anyone who meets the content.
+        id: 'report',
         title: 'Report',
         icon: <Icons.alert size={iconSize} />,
         onClickFn: () => openReportMail('message', getMessageUrl(message)),
@@ -177,7 +195,6 @@ export const useMessageActionMenuItems = (
     includeReaction,
     isOwner,
     isPinned,
-    linkCopied,
     pinMessageHandler,
     message,
     openDialog,
@@ -185,5 +202,5 @@ export const useMessageActionMenuItems = (
     replyInThreadHandler
   ])
 
-  return items
+  return { items, linkCopied }
 }

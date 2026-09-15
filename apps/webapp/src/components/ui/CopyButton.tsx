@@ -84,11 +84,14 @@ const CopyButton = forwardRef<HTMLButtonElement, CopyButtonProps>(
     const showLabel = !isIconOnly && (label || (copied && successLabel))
     const currentLabel = copied ? successLabel : label
 
+    const idleLabel = tooltip || currentLabel || 'Copy'
+    const doneLabel = successLabel
+
     const button = (
       <button
         ref={ref}
         type="button"
-        aria-label={tooltip || (typeof currentLabel === 'string' && currentLabel) || 'Copy'}
+        aria-label={copied ? doneLabel : idleLabel}
         onClick={handleClick}
         disabled={copying}
         className={twMerge(
@@ -100,25 +103,17 @@ const CopyButton = forwardRef<HTMLButtonElement, CopyButtonProps>(
           showLabel && gap,
           className
         )}>
-        <span className="relative inline-flex items-center justify-center">
-          <Icon
-            size={resolvedIconSize}
-            className={twMerge(
-              'stroke-[1.75] transition-all duration-200',
-              copied ? 'scale-0 opacity-0' : 'scale-100 opacity-100'
-            )}
-          />
-          <SuccessIcon
-            size={resolvedIconSize}
-            className={twMerge(
-              'text-success absolute stroke-[1.75] transition-all duration-200',
-              copied ? 'scale-100 opacity-100' : 'scale-0 opacity-0'
-            )}
-          />
+        <span className={`swap ${copied ? 'swap-active' : ''}`} aria-hidden>
+          <SuccessIcon size={resolvedIconSize} className="swap-on text-success stroke-[1.75]" />
+          <Icon size={resolvedIconSize} className="swap-off stroke-[1.75]" />
         </span>
 
         {showLabel && (
-          <span className={twMerge('transition-colors duration-200', copied && 'text-success')}>
+          <span
+            className={twMerge(
+              'motion-safe:transition-colors motion-safe:duration-[var(--motion-panel)]',
+              copied && 'text-success'
+            )}>
             {currentLabel}
           </span>
         )}
@@ -127,7 +122,7 @@ const CopyButton = forwardRef<HTMLButtonElement, CopyButtonProps>(
 
     if (!tooltip) return button
 
-    return <Tooltip title={tooltip}>{button}</Tooltip>
+    return <Tooltip title={copied ? doneLabel : tooltip}>{button}</Tooltip>
   }
 )
 
