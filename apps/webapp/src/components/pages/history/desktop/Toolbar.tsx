@@ -1,8 +1,4 @@
-import {
-  clearHistoryHash,
-  copyHistoryVersionLinkToClipboard,
-  copyVersionLinkTitle
-} from '@components/pages/history/historyShareUrl'
+import { clearHistoryHash } from '@components/pages/history/historyShareUrl'
 import ToolbarButton from '@components/TipTap/toolbar/ToolbarButton'
 import Button from '@components/ui/Button'
 import { Icons } from '@icons'
@@ -11,6 +7,7 @@ import { useStore } from '@stores'
 import { HistoryRestoreModal } from '../components/HistoryRestoreModal'
 import { HistoryToolbarVersionBlock } from '../components/HistoryToolbarVersionBlock'
 import { countVersionsAfter, formatCompareRange } from '../helpers'
+import { useCopyHistoryVersionLink } from '../hooks/useCopyHistoryVersionLink'
 import { useGetVersionInfo } from '../hooks/useGetVersionInfo'
 import { useHistoryCompare } from '../hooks/useHistoryCompare'
 import { useVersionRestore } from '../hooks/useVersionRestore'
@@ -21,11 +18,22 @@ const Toolbar = () => {
   const activeHistory = useStore((state) => state.activeHistory)
   const historyList = useStore((state) => state.historyList)
   const versionInfo = useGetVersionInfo()
-  const { restoreOpen, setRestoreOpen, requestRestore, confirmRestore, restoring, canRestore } =
-    useVersionRestore()
+  const {
+    restoreOpen,
+    setRestoreOpen,
+    requestRestore,
+    confirmRestore,
+    restoring,
+    canRestore,
+    allowRestore
+  } = useVersionRestore()
   const { compareMode, compareBaseItem, canCompare, toggleCompare, exitCompare } =
     useHistoryCompare()
-  const copyLinkLabel = versionInfo ? copyVersionLinkTitle(versionInfo.createdAt) : null
+  const {
+    copy: copyVersionLink,
+    copied,
+    label: copyLinkLabel
+  } = useCopyHistoryVersionLink(versionInfo?.version, versionInfo?.createdAt)
   const compareRange =
     compareMode && compareBaseItem && activeHistory
       ? formatCompareRange(compareBaseItem.createdAt, activeHistory.createdAt)
@@ -47,6 +55,7 @@ const Toolbar = () => {
             onRequestRestore={requestRestore}
             restoring={restoring}
             canRestore={canRestore}
+            allowRestore={allowRestore}
           />
         </div>
       </header>
@@ -56,12 +65,15 @@ const Toolbar = () => {
           <ToolbarButton onClick={() => window.print()} tooltip="Print (⌘+P)" aria-label="Print">
             <Icons.print size={ICON_SIZE} />
           </ToolbarButton>
-          {versionInfo && copyLinkLabel && (
+          {versionInfo && (
             <ToolbarButton
-              onClick={() => void copyHistoryVersionLinkToClipboard(versionInfo.version)}
+              onClick={() => void copyVersionLink()}
               tooltip={copyLinkLabel}
               aria-label={copyLinkLabel}>
-              <Icons.link size={ICON_SIZE} />
+              <span className={`swap ${copied ? 'swap-active' : ''}`} aria-hidden>
+                <Icons.check size={ICON_SIZE} className="swap-on text-success stroke-[1.75]" />
+                <Icons.link size={ICON_SIZE} className="swap-off stroke-[1.75]" />
+              </span>
             </ToolbarButton>
           )}
           <ToolbarButton

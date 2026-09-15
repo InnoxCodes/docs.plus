@@ -1,5 +1,6 @@
 import { sendHistoryRevertRequest } from '@components/pages/history/historyStatelessWire'
 import * as toast from '@components/toast'
+import { selectDocumentEditingLocked } from '@hooks/isDocumentEditingLocked'
 import { useAuthStore, useStore } from '@stores'
 import { isProviderDisconnected } from '@utils/providerCollabStatus'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -18,7 +19,8 @@ export const useVersionRestore = () => {
   const pendingWatchVersion = useStore((state) => state.pendingWatchVersion)
   const setLoadingHistory = useStore((state) => state.setLoadingHistory)
   const activeHistory = useStore((state) => state.activeHistory)
-  const user = useAuthStore((state) => state.profile)
+  const userId = useAuthStore((state) => state.profile?.id)
+  const editingLocked = useStore((state) => selectDocumentEditingLocked(state.settings, userId))
 
   const [restoreOpen, setRestoreOpen] = useState(false)
   const [restoring, setRestoring] = useState(false)
@@ -39,24 +41,31 @@ export const useVersionRestore = () => {
 
   useEffect(() => clearTimer, [clearTimer])
 
+  // Same gates as history.revert: signed-in writer, not locked.
+  const allowRestore = Boolean(userId) && !editingLocked
+
+  // A leftover confirm would no-op and look like Restore ran.
+  useEffect(() => {
+    if (!allowRestore) setRestoreOpen(false)
+  }, [allowRestore])
+
   // `activeHistory` still names the PREVIOUS version while a watch is in flight.
   // Restoring here would replace the document for everyone with a version the reader
   // did not ask for. `canRestore` also keeps the 30s timeout from being cancelled by the
   // incoming watch clearing the shared `loadingHistory` flag.
-  const canRestore = pendingWatchVersion == null && !restoring
+  const canRestore = allowRestore && pendingWatchVersion == null && !restoring
 
   const requestRestore = useCallback(() => {
+    if (!allowRestore) return
     if (!activeHistory?.version) return
     if (pendingWatchVersion != null) return
-    if (!user) {
-      toast.Error('Sign in to restore a version.')
-      return
-    }
     setRestoreOpen(true)
-  }, [activeHistory?.version, pendingWatchVersion, user])
+  }, [activeHistory?.version, allowRestore, pendingWatchVersion])
 
   const confirmRestore = useCallback(() => {
+    if (!allowRestore) return
     if (!activeHistory?.version) return
+    if (pendingWatchVersion != null) return
     if (restoring) return
 
     // A frame sent on a closed socket is QUEUED by the provider and flushed on
@@ -88,9 +97,19 @@ export const useVersionRestore = () => {
     documentId,
     hocuspocusProvider,
     providerStatus,
+    allowRestore,
+    pendingWatchVersion,
     restoring,
     setLoadingHistory
   ])
 
-  return { restoreOpen, setRestoreOpen, requestRestore, confirmRestore, restoring, canRestore }
+  return {
+    restoreOpen,
+    setRestoreOpen,
+    requestRestore,
+    confirmRestore,
+    restoring,
+    canRestore,
+    allowRestore
+  }
 }

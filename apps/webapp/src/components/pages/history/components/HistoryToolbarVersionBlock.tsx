@@ -9,24 +9,27 @@ type Props = {
   restoring?: boolean
   /** False while a version watch is in flight — `versionInfo` still names the old one. */
   canRestore?: boolean
+  /** Signed-in writer only. Visitors never see Restore. */
+  allowRestore?: boolean
 }
 
 export function HistoryToolbarVersionBlock({
   versionInfo,
   onRequestRestore,
   restoring = false,
-  canRestore = true
+  canRestore = false,
+  allowRestore = false
 }: Props) {
   if (!versionInfo) return null
 
   const { date, time } = formatVersionDate(versionInfo.createdAt)
-  const showRestore = !versionInfo.isLatestVersion
+  const showRestore = allowRestore && !versionInfo.isLatestVersion
   // The date and time is what the sidebar shows; a version number appears nowhere a reader can see.
   const restoreLabel = `Restore this version from ${date} at ${time}`
 
   return (
     <div className="flex min-w-0 items-center justify-end gap-2">
-      {!showRestore && (
+      {versionInfo.isLatestVersion && (
         <span className="text-base-content/60 text-sm">This is the current version.</span>
       )}
       {showRestore && (

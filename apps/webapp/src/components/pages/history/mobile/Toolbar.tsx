@@ -1,8 +1,4 @@
-import {
-  clearHistoryHash,
-  copyHistoryVersionLinkToClipboard,
-  copyVersionLinkTitle
-} from '@components/pages/history/historyShareUrl'
+import { clearHistoryHash } from '@components/pages/history/historyShareUrl'
 import ToolbarButton from '@components/TipTap/toolbar/ToolbarButton'
 import Button from '@components/ui/Button'
 import { Icons } from '@icons'
@@ -10,6 +6,7 @@ import { useSheetStore, useStore } from '@stores'
 
 import { HistoryRestoreModal } from '../components/HistoryRestoreModal'
 import { countVersionsAfter, formatCompareRange, formatVersionDate } from '../helpers'
+import { useCopyHistoryVersionLink } from '../hooks/useCopyHistoryVersionLink'
 import { useGetVersionInfo } from '../hooks/useGetVersionInfo'
 import { useHistoryCompare } from '../hooks/useHistoryCompare'
 import { useVersionRestore } from '../hooks/useVersionRestore'
@@ -20,8 +17,15 @@ const Toolbar = ({ onOpenCompareSheet }: { onOpenCompareSheet: () => void }) => 
   const activeHistory = useStore((state) => state.activeHistory)
   const historyList = useStore((state) => state.historyList)
   const versionInfo = useGetVersionInfo()
-  const { restoreOpen, setRestoreOpen, requestRestore, confirmRestore, restoring, canRestore } =
-    useVersionRestore()
+  const {
+    restoreOpen,
+    setRestoreOpen,
+    requestRestore,
+    confirmRestore,
+    restoring,
+    canRestore,
+    allowRestore
+  } = useVersionRestore()
   const { compareMode, compareBaseItem, canCompare, exitCompare } = useHistoryCompare()
   const close = useSheetStore((state) => state.closeSheet)
   const compareSheetOpen = useSheetStore((state) => state.activeSheet === 'historyCompare')
@@ -29,7 +33,11 @@ const Toolbar = ({ onOpenCompareSheet }: { onOpenCompareSheet: () => void }) => 
     compareMode && compareBaseItem && activeHistory
       ? formatCompareRange(compareBaseItem.createdAt, activeHistory.createdAt)
       : null
-  const copyLinkLabel = versionInfo ? copyVersionLinkTitle(versionInfo.createdAt) : null
+  const {
+    copy: copyVersionLink,
+    copied,
+    label: copyLinkLabel
+  } = useCopyHistoryVersionLink(versionInfo?.version, versionInfo?.createdAt)
   const restoreStamp = versionInfo ? formatVersionDate(versionInfo.createdAt) : null
   const restoreLabel = restoreStamp
     ? `Restore this version from ${restoreStamp.date} at ${restoreStamp.time}`
@@ -62,13 +70,19 @@ const Toolbar = ({ onOpenCompareSheet }: { onOpenCompareSheet: () => void }) => 
         </div>
 
         <div className="flex shrink-0 items-center">
-          {versionInfo && copyLinkLabel && (
+          {versionInfo && (
             <ToolbarButton
               className="shrink-0 touch-manipulation"
-              onClick={() => void copyHistoryVersionLinkToClipboard(versionInfo.version)}
+              onClick={() => void copyVersionLink()}
               tooltip={copyLinkLabel}
               aria-label={copyLinkLabel}>
-              <Icons.link size={ICON_SIZE} className="text-base-content/70 stroke-[1.75]" />
+              <span className={`swap ${copied ? 'swap-active' : ''}`} aria-hidden>
+                <Icons.check size={ICON_SIZE} className="swap-on text-success stroke-[1.75]" />
+                <Icons.link
+                  size={ICON_SIZE}
+                  className="swap-off text-base-content/70 stroke-[1.75]"
+                />
+              </span>
             </ToolbarButton>
           )}
           <ToolbarButton
@@ -113,7 +127,7 @@ const Toolbar = ({ onOpenCompareSheet }: { onOpenCompareSheet: () => void }) => 
         </div>
       </div>
 
-      {versionInfo && !versionInfo.isLatestVersion && restoreLabel && (
+      {allowRestore && versionInfo && !versionInfo.isLatestVersion && restoreLabel && (
         <div className="border-base-300 flex items-center justify-center border-b px-2 py-1.5">
           <Button
             variant="primary"

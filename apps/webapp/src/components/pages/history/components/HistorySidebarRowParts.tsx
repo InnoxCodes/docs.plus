@@ -1,7 +1,3 @@
-import {
-  copyHistoryVersionLinkToClipboard,
-  copyVersionLinkTitle
-} from '@components/pages/history/historyShareUrl'
 import { Avatar } from '@components/ui/Avatar'
 import { AvatarStack } from '@components/ui/AvatarStack'
 import Button from '@components/ui/Button'
@@ -13,6 +9,7 @@ import { useMemo } from 'react'
 import { twMerge } from 'tailwind-merge'
 
 import { formatRelativeTime, formatTime } from '../helpers'
+import { useCopyHistoryVersionLink } from '../hooks/useCopyHistoryVersionLink'
 
 export function CopyVersionLinkButton({
   version,
@@ -27,7 +24,7 @@ export function CopyVersionLinkButton({
   inlineInRow?: boolean
   className?: string
 }) {
-  const copyTitle = copyVersionLinkTitle(createdAt)
+  const { copy, copied, label } = useCopyHistoryVersionLink(version, createdAt)
   return (
     <Button
       type="button"
@@ -47,16 +44,19 @@ export function CopyVersionLinkButton({
           : 'opacity-0 max-md:opacity-100 md:group-hover:opacity-100 md:focus-visible:opacity-100',
         className
       )}
-      startIcon={Icons.link}
-      aria-label={copyTitle}
-      tooltip={copyTitle}
+      aria-label={label}
+      tooltip={label}
       tooltipPlacement="left"
       onClick={(e) => {
         e.stopPropagation()
         e.preventDefault()
-        void copyHistoryVersionLinkToClipboard(version)
-      }}
-    />
+        void copy()
+      }}>
+      <span className={`swap ${copied ? 'swap-active' : ''}`} aria-hidden>
+        <Icons.check size={16} className="swap-on text-success stroke-[1.75]" />
+        <Icons.link size={16} className="swap-off stroke-[1.75]" />
+      </span>
+    </Button>
   )
 }
 

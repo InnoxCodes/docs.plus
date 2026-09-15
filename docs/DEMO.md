@@ -424,15 +424,15 @@ A rule ends a passage. It carries no text, so a filter never keeps a section for
 
 Every save is **a whole snapshot of the document**, with a rising version number. Typing is saved after 10 seconds of quiet, and forced after 60 seconds when you keep going.
 
-Open the history from the clock button in the document header — needs an account.
+Open the history from the clock button in the document header. A public document does not need an account to read it.
 
 Versions arrive grouped into _sessions_, then into days titled Today, Yesterday, or a date. A session breaks after a gap of two minutes. A row carries the faces of the people in that version. It also carries a badge naming where the version came from: API, Checkpoint, Restored, Pre-restore, or Migration. An ordinary live save gets no badge.
 
-Click a version and it renders in a read-only editor, so **reading an old draft changes nothing**. Heading chat is hidden while you read one. Inside the view you can compare two versions, copy a link to one, and print the one you are reading — needs an account.
+Click a version and it renders in a read-only editor, so **reading an old draft changes nothing**. Heading chat is hidden while you read one. Inside the view you can compare two versions, copy a link to one, and print the one you are reading.
 
 Compare marks what was added inline, and keeps what was removed as struck-through text. The authors panel colours each block by whose text sits there now.
 
-**Restore puts an old version back for everybody**, and it is offered on every version except the latest — needs a document you can edit. A restore writes a safety copy of the current text first, and that copy carries the Pre-restore badge.
+**Restore puts an old version back for everybody.** It is offered only to a signed-in writer, and only on a version that is not the latest. A visitor never sees the control. A restore writes a safety copy of the current text first, and that copy carries the Pre-restore badge.
 
 After 30 days, old automatic saves are thinned to one per day. Each day's newest save survives. A version you named yourself is never thinned.
 

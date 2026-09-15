@@ -46,7 +46,7 @@ Next step: resolve the id once through `GET /api/documents/<SLUG>` and store it.
 
 A public document accepts a connection with no token at all. That is deliberate — it is how a visitor reads and edits a public document without signing in.
 
-Send a token when you have one. It is what gives the change an author, so version history can name who wrote what.
+Send a token when you have one. It is what gives the change an author, so version history can name who wrote what. Restore (`history.revert`) also needs that token and a writable connection. A visitor may read history. A visitor cannot restore.
 
 ## Private documents admit the owner only
 

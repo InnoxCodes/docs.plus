@@ -36,6 +36,8 @@ Shared names for docs.plus domain concepts. Architecture reviews and deepenings 
 - **Open document** — a document with no `ownerId`. Anyone may retitle it, signed in or not. First edit and first persist do not stamp an owner. A signed-in `PUT` or `POST` create still does. Private/Read-only locks stay off until ownership handoff ships.
 - **Live seal** — REST publish → Redis `doc:{id}:access` → WS broadcast/close → client `applyAccessStateless`.
 - **Editing lock** — client cannot edit: content-fork error, `authorizedScope === 'readonly'`, or metadata Read-only for a non-owner (`selectDocumentEditingLocked`).
+- **Restore** — a signed-in writer putting a stored version back into the live document through `history.revert`. History is readable without a session. Restore is not. The control is hidden when there is no profile and when the editing lock is on. The server refuses the same cases (`unauthorized`, `read-only`).
+  _Avoid_: client `setContent` as the write; showing Restore to a visitor
 
 ## Document changes
 

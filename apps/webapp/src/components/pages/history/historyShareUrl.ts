@@ -142,7 +142,7 @@ export function copyVersionLinkTitle(createdAt: string): string {
   return `Copy link to the version from ${date} at ${time}`
 }
 
-export async function copyHistoryVersionLinkToClipboard(version: number): Promise<void> {
+export async function copyHistoryVersionLinkToClipboard(version: number): Promise<boolean> {
   const url = buildHistoryShareUrl(version)
   const ok = await copyToClipboard(url)
   if (ok) {
@@ -150,4 +150,5 @@ export async function copyHistoryVersionLinkToClipboard(version: number): Promis
   } else {
     toast.Error("Couldn't copy link")
   }
+  return ok
 }

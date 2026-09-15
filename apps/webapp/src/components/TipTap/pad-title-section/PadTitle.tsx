@@ -108,8 +108,7 @@ const PadTitle = () => {
             Share
           </Button>
 
-          {/* History is read-only for everyone. The server refuses `history.revert`
-              for a visitor (hocuspocus.server.ts), so reading a version is safe. */}
+          {/* History is readable without a session. */}
           <Button
             variant="ghost"
             shape="circle"
