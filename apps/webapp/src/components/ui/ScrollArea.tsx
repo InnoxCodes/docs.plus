@@ -1,7 +1,17 @@
-import { type CSSProperties, forwardRef, type HTMLAttributes, type ReactNode } from 'react'
+import {
+  type CSSProperties,
+  forwardRef,
+  type HTMLAttributes,
+  type ReactNode,
+  useCallback,
+  useRef
+} from 'react'
 import { twMerge } from 'tailwind-merge'
 
+import { type ScrollFade, useScrollOverflow } from './useScrollOverflow'
+
 type ScrollOrientation = 'vertical' | 'horizontal' | 'both'
+
 type ScrollbarSize = 'thin' | 'default'
 
 export interface ScrollAreaProps extends HTMLAttributes<HTMLDivElement> {
@@ -14,6 +24,7 @@ export interface ScrollAreaProps extends HTMLAttributes<HTMLDivElement> {
    * @default true
    */
   preserveWidth?: boolean
+  fade?: ScrollFade
 }
 
 /** Single scrollable root + theme scrollbar classes — no inner wrapper. */
@@ -35,6 +46,7 @@ function mergeScrollStyle(
   style: CSSProperties | undefined
 ): CSSProperties | undefined {
   if (!preserveWidth) return style
+
   return style ? { scrollbarGutter: 'stable', ...style } : { scrollbarGutter: 'stable' }
 }
 
@@ -60,16 +72,31 @@ const ScrollArea = forwardRef<HTMLDivElement, ScrollAreaProps>(function ScrollAr
     scrollbarSize = 'default',
     hideScrollbar = false,
     preserveWidth = true,
+    fade = false,
     style,
     ...props
   },
   ref
 ) {
+  const nodeRef = useRef<HTMLDivElement>(null)
+  useScrollOverflow(nodeRef, fade)
+
+  const setRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      nodeRef.current = node
+
+      if (typeof ref === 'function') ref(node)
+      else if (ref) ref.current = node
+    },
+    [ref]
+  )
+
   return (
     <div
-      ref={ref}
+      ref={fade ? setRef : ref}
       className={scrollAreaClassName(orientation, scrollbarSize, hideScrollbar, className)}
       style={mergeScrollStyle(preserveWidth, style)}
+      data-scroll-fade={fade || undefined}
       {...props}>
       {children}
     </div>

@@ -17,24 +17,26 @@ function TocMobileComponent({ className = '' }: TocMobileProps) {
 
   const nestedItems = useMemo(() => buildNestedToc(items), [items])
 
-  if (!items.length) {
-    return <TocEmptyState className={className} />
-  }
-
   return (
     <div className={className}>
-      <ul className={`${TOC_CLASSES.listMenu} my-2 p-0`}>
-        {nestedItems.map(({ item, nodes }) => (
-          <TocItemBody
-            key={item.id}
-            item={item}
-            nestedNodes={nodes}
-            onToggle={toggleSection}
-            variant="mobile"
-          />
-        ))}
-      </ul>
-      <AppendHeadingButton className="mt-4" />
+      {!items.length ? (
+        <TocEmptyState />
+      ) : (
+        <>
+          <ul className={`${TOC_CLASSES.listMenu} my-2 p-0`}>
+            {nestedItems.map(({ item, nodes }) => (
+              <TocItemBody
+                key={item.id}
+                item={item}
+                nestedNodes={nodes}
+                onToggle={toggleSection}
+                variant="mobile"
+              />
+            ))}
+          </ul>
+          <AppendHeadingButton className="mt-4" />
+        </>
+      )}
     </div>
   )
 }

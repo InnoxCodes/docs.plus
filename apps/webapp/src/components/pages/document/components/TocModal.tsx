@@ -41,6 +41,7 @@ const TocModal = () => {
   const loading = useStore((state) => state.settings.editor.loading)
   const providerSyncing = useStore((state) => state.settings.editor.providerSyncing)
   const editor = useStore((state) => state.settings.editor.instance)
+
   const hasActiveFilters = useStore(
     (state) => state.settings.editor.filterResult.sortedSlugs.length > 0
   )
@@ -89,7 +90,7 @@ const TocModal = () => {
 
         <div className="bg-base-200 flex min-h-0 flex-1 flex-col overflow-hidden">
           <TocHeader variant="mobile" />
-          <ScrollArea className="h-0 min-h-0 flex-1" scrollbarSize="thin" hideScrollbar>
+          <ScrollArea className="h-0 min-h-0 flex-1" scrollbarSize="thin" hideScrollbar fade="both">
             <TocMobile className="tiptap__toc w-full pb-6" />
           </ScrollArea>
         </div>

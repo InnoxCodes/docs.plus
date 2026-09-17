@@ -409,6 +409,8 @@
     color-mix(in oklch, black 72%, transparent),
     color-mix(in oklch, black 80%, transparent)
   );
+  /* Overflow-edge fade on opt-in ScrollArea — alpha mask size, not a color. */
+  --scroll-fade-size: 1.25rem;
 }
 
 /* extension-hypermultimedia (resize-gripper.css, media-toolbar.css, media-loading-shell.css)

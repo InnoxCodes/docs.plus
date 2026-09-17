@@ -38,7 +38,8 @@ const TOC = ({ className = '' }: { className?: string }) => {
         className="toc__scroll min-h-0 flex-1 !pt-0"
         scrollbarSize="thin"
         hideScrollbar
-        preserveWidth={true}>
+        preserveWidth={true}
+        fade="end">
         <TocDesktop className="w-full hover:overscroll-contain" />
       </ScrollArea>
     </div>

@@ -129,3 +129,40 @@
   background-color: var(--scrollbar-thumb-hover);
   transition: background-color 0.18s ease;
 }
+
+/* Alpha mask, not a box-shadow — docked light surfaces stay flat. */
+[data-scroll-fade='start'][data-scroll-overflow='start'],
+[data-scroll-fade='start'][data-scroll-overflow='both'],
+[data-scroll-fade='both'][data-scroll-overflow='start'] {
+  --_scroll-fade-mask: linear-gradient(to bottom, transparent, #000 var(--scroll-fade-size), #000);
+  -webkit-mask-image: var(--_scroll-fade-mask);
+  mask-image: var(--_scroll-fade-mask);
+  mask-mode: alpha;
+}
+
+[data-scroll-fade='end'][data-scroll-overflow='end'],
+[data-scroll-fade='end'][data-scroll-overflow='both'],
+[data-scroll-fade='both'][data-scroll-overflow='end'] {
+  --_scroll-fade-mask: linear-gradient(
+    to bottom,
+    #000 0%,
+    #000 calc(100% - var(--scroll-fade-size)),
+    transparent
+  );
+  -webkit-mask-image: var(--_scroll-fade-mask);
+  mask-image: var(--_scroll-fade-mask);
+  mask-mode: alpha;
+}
+
+[data-scroll-fade='both'][data-scroll-overflow='both'] {
+  --_scroll-fade-mask: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--scroll-fade-size),
+    #000 calc(100% - var(--scroll-fade-size)),
+    transparent
+  );
+  -webkit-mask-image: var(--_scroll-fade-mask);
+  mask-image: var(--_scroll-fade-mask);
+  mask-mode: alpha;
+}
