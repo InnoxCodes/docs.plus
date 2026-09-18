@@ -4,7 +4,7 @@ import type { Transaction } from '@tiptap/pm/state'
 import type { TocItem } from '@types'
 import { TIPTAP_NODES } from '@types'
 import throttle from 'lodash/throttle'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 
 import { transactionRequiresTocRebuild } from '../utils/headingTransaction'
 
@@ -21,6 +21,23 @@ function snapshotFoldState(state: HeadingFoldSlice): FoldSnapshot {
     foldedIds: new Set(state?.foldedIds ?? []),
     animating: new Map(state?.animating ?? [])
   }
+}
+
+function tocItemsEqual(a: TocItem[], b: TocItem[]): boolean {
+  if (a.length !== b.length) return false
+  for (let i = 0; i < a.length; i++) {
+    const left = a[i]
+    const right = b[i]
+    if (
+      left.id !== right.id ||
+      left.level !== right.level ||
+      left.textContent !== right.textContent ||
+      left.open !== right.open
+    ) {
+      return false
+    }
+  }
+  return true
 }
 
 function foldSnapshotsEqual(a: FoldSnapshot, b: FoldSnapshot): boolean {
@@ -70,7 +87,7 @@ export function useToc() {
       })
     }
 
-    setItems(headings)
+    setItems((prev) => (tocItemsEqual(prev, headings) ? prev : headings))
     foldSnapshotRef.current = snapshotFoldState(headingFoldPluginKey.getState(editor.state))
   }, [editor])
 
@@ -82,8 +99,11 @@ export function useToc() {
     [editor]
   )
 
-  useEffect(() => {
-    if (!editor) return
+  useLayoutEffect(() => {
+    if (!editor || editor.isDestroyed) {
+      setItems([])
+      return
+    }
 
     foldSnapshotRef.current = snapshotFoldState(headingFoldPluginKey.getState(editor.state))
 
@@ -110,7 +130,7 @@ export function useToc() {
     }
 
     editor.on('transaction', handleTransaction)
-
+    buildTocItems()
     const initTimer = setTimeout(buildTocItems, 200)
 
     return () => {

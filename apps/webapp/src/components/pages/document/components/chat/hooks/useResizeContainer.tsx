@@ -9,9 +9,10 @@ const LOCAL_STORAGE_KEY = 'docsy:chat-height'
 const useResizeContainer = () => {
   const containerRef = useRef<HTMLDivElement>(null)
   const setOrUpdateChatPanelHeight = useChatStore((state) => state.setOrUpdateChatPanelHeight)
-  const { panelHeight: storeHeight } = useChatStore((state) => state.chatRoom)
+  const storeHeight = useChatStore((state) => state.chatRoom.panelHeight)
   const [isResizing, setIsResizing] = useState(false)
   const editor = useStore((state) => state.settings.editor.instance)
+  const dragCleanupRef = useRef<(() => void) | null>(null)
 
   useEffect(() => {
     try {
@@ -76,6 +77,7 @@ const useResizeContainer = () => {
       }
 
       const stopDrag = () => {
+        dragCleanupRef.current = null
         setIsResizing(false)
         window.dispatchEvent(new CustomEvent('chat-panel-resize-end'))
         setOrUpdateChatPanelHeight(lastHeight)
@@ -87,13 +89,22 @@ const useResizeContainer = () => {
 
         document.removeEventListener('mousemove', doDrag)
         document.removeEventListener('mouseup', stopDrag)
+        document.removeEventListener('pointercancel', stopDrag)
       }
 
+      dragCleanupRef.current = stopDrag
       document.addEventListener('mousemove', doDrag)
       document.addEventListener('mouseup', stopDrag)
+      document.addEventListener('pointercancel', stopDrag)
     },
     [editor, setOrUpdateChatPanelHeight]
   )
+
+  useEffect(() => {
+    return () => {
+      dragCleanupRef.current?.()
+    }
+  }, [])
 
   useEffect(() => {
     const handleWindowResize = () => {

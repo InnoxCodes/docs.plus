@@ -14,7 +14,7 @@ export const ChatroomPanelLayout = ({ children }: Props) => {
     // ProseMirror are forbidden (containing-block/caret hazards). Exit unmounts instantly.
     <div
       ref={containerRef}
-      className="group/chat bg-base-100 border-base-300 absolute inset-x-0 bottom-0 z-40 flex w-full flex-col border-t motion-safe:animate-[doc-content-in_200ms_ease-out_both]"
+      className="group/chat bg-base-100 border-base-300 absolute inset-x-0 bottom-0 z-[42] flex w-full flex-col border-t motion-safe:animate-[doc-content-in_200ms_ease-out_both]"
       style={{ height: `${height}px` }}>
       <ResizeHandle
         orientation="horizontal"
