@@ -12,12 +12,12 @@ Shared names for docs.plus domain concepts. Architecture reviews and deepenings 
 - **Subtitle** — a paragraph style, not a heading. It is not a TOC heading.
 - **HeadingScale** — visual size by rank inside a section. Distinct from Block style. The same heading level can look larger or smaller depending on the section.
 - **Heading slug trail** (`?h=`) — outline ancestry from the target heading up through each parent to Title. Not a join of every heading before the target. `id=` is the resolver.
-- **Wide TOC** — the desktop outline column. Painted width ≥ 240. Persist key `docsy:toc-width`. Wrap titles, nest, fold, Heading Chat Surface, unread, and presence live here.
+- **Wide TOC** — the desktop outline column. Painted width ≥ 240. Wrap titles, nest, fold, Heading Chat Surface, unread, and presence live here.
   _Avoid_: Tick rail, persist-rail
-- **Tick rail** — session-only 32px heading minimap (`TocTickRail`) in the pad row. Desktop only. Hides folded descendants. Depth-fits to `min(84% of the viewport, live rail)` and fills leftover slots around the spy. Windows the 8px list. Keep-in-view spy follow. Refresh and workspace change restore Wide TOC. Not a second outline product.
+- **Tick rail** — session-only 32px heading minimap (`TocTickRail`) in the pad row. Desktop only. Hides folded descendants. Depth-fits to `min(84% of the viewport, live rail)` and fills leftover slots around the spy. Windows the 8px list. Keep-in-view spy follow. A short stack sits in the middle of the live rail and recenters with `--motion-panel` when chat opens or closes. Persist is last committed Wide TOC width only (`docsy:toc-width`, greater than 240). Refresh and workspace change restore Wide TOC. Not a second outline product.
   _Avoid_: SideContinuum, Outline minimap, persist-rail
 - **Painted width** — the TOC column width this frame. Locks to 32 in `rail` and `settle-to-rail`.
-- **tocWidth** — last committed Wide TOC width only (≥240). Never the rail. `useTocResize` writes it on release, not on every pointer move.
+- **tocWidth** — last committed Wide TOC width only (>240). Never the rail or the 240 abort floor. `useTocResize` writes it on release, not on every pointer move.
 
 ## Documents list
 

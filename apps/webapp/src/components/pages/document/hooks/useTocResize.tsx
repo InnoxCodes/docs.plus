@@ -41,9 +41,7 @@ export const resolveTocContainerWidth = (tocEl: HTMLDivElement | null | undefine
 export const readPersistedTocWidth = (): number => {
   try {
     const parsed = parseInt(localStorage.getItem(TOC_WIDTH_STORAGE_KEY) ?? '', 10)
-    if (!isNaN(parsed)) {
-      return Math.max(TOC_MIN_WIDTH, parsed)
-    }
+    if (Number.isFinite(parsed) && parsed > TOC_MIN_WIDTH) return parsed
   } catch {
     // localStorage unavailable — fall through to the default
   }
@@ -51,12 +49,16 @@ export const readPersistedTocWidth = (): number => {
 }
 
 const persistTocWidth = (width: number) => {
+  if (width <= TOC_MIN_WIDTH) return
   try {
     localStorage.setItem(TOC_WIDTH_STORAGE_KEY, String(width))
   } catch {
     // private-mode / quota — width stays in memory
   }
 }
+
+const rememberedWideWidth = (width: number): number =>
+  width > TOC_MIN_WIDTH ? width : TOC_DEFAULT_WIDTH
 
 const clearResizeCursor = () => {
   document.body.style.userSelect = ''
@@ -71,6 +73,8 @@ export const useTocResize = () => {
   const [mode, setMode] = useState<TocMode>('wide')
   const [hydrated, setHydrated] = useState(false)
   const lastWideWidthRef = useRef(TOC_DEFAULT_WIDTH)
+  const paintRef = useRef(paint)
+  paintRef.current = paint
   const prevWorkspaceIdRef = useRef(workspaceId)
   const dragStartXRef = useRef(0)
   const initialPaintedWidthRef = useRef(0)
@@ -86,23 +90,21 @@ export const useTocResize = () => {
     mode === 'settle-to-wide' ||
     (mode === 'drag' && paint < TOC_MIN_WIDTH)
 
-  if (mode === 'wide' && tocWidth >= TOC_MIN_WIDTH) {
-    lastWideWidthRef.current = tocWidth
-  }
-
   const reduced = prefersReducedMotion()
 
   const clampCurrentWidthToContainer = useCallback(() => {
     if (modeRef.current !== 'wide' && modeRef.current !== 'settle-to-wide') return
+    if (modeRef.current === 'wide' && paintRef.current <= TOC_MIN_WIDTH) return
     const containerWidth = resolveTocContainerWidth(tocRef.current)
     if (containerWidth <= 0) return
-    const next = clampTocWidth(lastWideWidthRef.current, containerWidth)
+    const next = clampTocWidth(rememberedWideWidth(lastWideWidthRef.current), containerWidth)
     setTocWidth(next)
     if (modeRef.current === 'wide') setPaint(next)
   }, [])
 
   useLayoutEffect(() => {
     const persisted = readPersistedTocWidth()
+    lastWideWidthRef.current = persisted
     const containerWidth = resolveTocContainerWidth(tocRef.current)
     const next = containerWidth > 0 ? clampTocWidth(persisted, containerWidth) : persisted
     setTocWidth(next)
@@ -120,17 +122,17 @@ export const useTocResize = () => {
 
   useEffect(() => {
     if (!hydrated) return
-    if (mode === 'rail' || mode === 'settle-to-rail') return
+    const current = modeRef.current
+    if (current === 'rail' || current === 'settle-to-rail' || current === 'drag') return
     persistTocWidth(tocWidth)
-  }, [hydrated, tocWidth, mode])
+  }, [hydrated, tocWidth])
 
   useEffect(() => {
     if (prevWorkspaceIdRef.current === workspaceId) return
     prevWorkspaceIdRef.current = workspaceId
-    const wide = clampTocWidth(
-      Math.max(lastWideWidthRef.current, TOC_MIN_WIDTH),
-      resolveTocContainerWidth(tocRef.current)
-    )
+    const remembered = rememberedWideWidth(lastWideWidthRef.current)
+    lastWideWidthRef.current = remembered
+    const wide = clampTocWidth(remembered, resolveTocContainerWidth(tocRef.current))
     setTocWidth(wide)
     setPaint(wide)
     setMode('wide')
@@ -158,7 +160,10 @@ export const useTocResize = () => {
 
   useEffect(() => {
     if (mode !== 'settle-to-wide') return
-    const target = Math.max(lastWideWidthRef.current, TOC_MIN_WIDTH)
+    const target = clampTocWidth(
+      rememberedWideWidth(lastWideWidthRef.current),
+      resolveTocContainerWidth(tocRef.current)
+    )
     if (paint === target) return
     const id = window.setTimeout(() => setPaint(target), 16)
     return () => window.clearTimeout(id)
@@ -174,7 +179,7 @@ export const useTocResize = () => {
     }
 
     const next = Math.min(dragMaxWidthRef.current, intended)
-    lastWideWidthRef.current = next
+    if (next > lastWideWidthRef.current) lastWideWidthRef.current = next
     setPaint(next)
   }, [])
 
@@ -191,21 +196,20 @@ export const useTocResize = () => {
       return
     }
     if (intended < TOC_SNAP_WIDTH) {
-      const wide = lastWideWidthRef.current
+      const wide = rememberedWideWidth(lastWideWidthRef.current)
+      lastWideWidthRef.current = wide
       setTocWidth(wide)
       persistTocWidth(wide)
       setPaint(TOC_RAIL_WIDTH)
       setMode(reduced || intended <= TOC_RAIL_WIDTH ? 'rail' : 'settle-to-rail')
       return
     }
-    if (intended < TOC_MIN_WIDTH) {
-      lastWideWidthRef.current = TOC_MIN_WIDTH
-      setTocWidth(TOC_MIN_WIDTH)
+    const next = Math.min(dragMaxWidthRef.current, intended)
+    if (next <= TOC_MIN_WIDTH) {
       setPaint(TOC_MIN_WIDTH)
       setMode('wide')
       return
     }
-    const next = Math.min(dragMaxWidthRef.current, intended)
     lastWideWidthRef.current = next
     setTocWidth(next)
     setPaint(next)
@@ -217,7 +221,6 @@ export const useTocResize = () => {
       event.preventDefault()
       setMode('drag')
       dragStartXRef.current = event.clientX
-      lastWideWidthRef.current = Math.max(lastWideWidthRef.current, tocWidth)
       dragMaxWidthRef.current = getTocMaxWidth(resolveTocContainerWidth(tocRef.current))
       const start = tocRef.current?.offsetWidth ?? tocWidth
       initialPaintedWidthRef.current = start
@@ -242,17 +245,15 @@ export const useTocResize = () => {
   }, [handleMouseMove, handleMouseUp])
 
   const openWide = useCallback(() => {
-    const wide = clampTocWidth(
-      Math.max(lastWideWidthRef.current, TOC_MIN_WIDTH),
-      resolveTocContainerWidth(tocRef.current)
-    )
+    const remembered = rememberedWideWidth(lastWideWidthRef.current)
+    lastWideWidthRef.current = remembered
+    const wide = clampTocWidth(remembered, resolveTocContainerWidth(tocRef.current))
     setTocWidth(wide)
     if (reduced) {
       setPaint(wide)
       setMode('wide')
       return
     }
-    lastWideWidthRef.current = wide
     setPaint(TOC_RAIL_WIDTH)
     setMode('settle-to-wide')
   }, [reduced])

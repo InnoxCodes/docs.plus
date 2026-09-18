@@ -102,6 +102,11 @@ function visibleRailItems(items: TocItem[]): TocItem[] {
   return out
 }
 
+function railNavLooksStale(navH: number, viewH: number): boolean {
+  const vh = viewH > 0 ? viewH : navH
+  return navH <= 0 || (vh > 0 && navH > vh * RAIL_MAX_VIEWPORT_RATIO - TICK_ROW_FALLBACK_PX * 3)
+}
+
 function maxRailTicks(navH: number, viewH: number, chatH: number) {
   const vh = viewH > 0 ? viewH : window.innerHeight
   if (vh <= 0 && navH <= 0) return Number.POSITIVE_INFINITY
@@ -109,7 +114,7 @@ function maxRailTicks(navH: number, viewH: number, chatH: number) {
   const measured = navH > 0 ? Math.min(navH, viewCap) : viewCap
   // Chat writes `--chat-panel-height` in a later effect. Nav can still read
   // the full pad for one frame, so subtract chat until the rail has shrunk.
-  const staleOpen = chatH > 0 && (navH <= 0 || navH > viewCap - TICK_ROW_FALLBACK_PX * 3)
+  const staleOpen = chatH > 0 && railNavLooksStale(navH, vh)
   const budget = staleOpen ? Math.max(TICK_ROW_FALLBACK_PX, measured - chatH) : measured
   return Math.max(1, Math.floor(budget / TICK_ROW_FALLBACK_PX))
 }
@@ -198,6 +203,20 @@ function railWindow(scrollTop: number, height: number, count: number) {
   return { start, end }
 }
 
+function liveRailHeight(navH: number, viewH: number, chatH: number): number {
+  if (chatH <= 0) return Math.max(0, navH)
+  const vh = viewH > 0 ? viewH : navH
+  if (railNavLooksStale(navH, vh)) return Math.max(0, (navH > 0 ? navH : vh) - chatH)
+  return navH
+}
+
+function railStackOffset(railH: number, stackH: number): number {
+  if (stackH <= 0 || railH <= 0) return 0
+  const room = railH - stackH
+  if (room <= 0) return 0
+  return Math.floor(room / 2)
+}
+
 function clampScroll(next: number, max: number) {
   return Math.max(0, Math.min(max, next))
 }
@@ -235,16 +254,14 @@ function alignRailToSpy(nav: HTMLElement, index: number, count: number) {
 
 function readRailGeometry(nav: HTMLElement): RailGeometry {
   const rail = nav.getBoundingClientRect()
-  const style = getComputedStyle(nav)
-  const padTop = parseFloat(style.paddingTop) || 0
-  const rowPx = TICK_ROW_FALLBACK_PX
+  const stack = nav.querySelector<HTMLElement>('[data-toc-rail-stack]')
   return {
     top: rail.top,
     left: rail.left,
     right: rail.right,
     bottom: rail.bottom,
-    firstTop: rail.top + padTop - nav.scrollTop,
-    rowPx
+    firstTop: stack?.getBoundingClientRect().top ?? rail.top,
+    rowPx: TICK_ROW_FALLBACK_PX
   }
 }
 
@@ -504,21 +521,12 @@ function useTickHoverProximity(
 ) {
   const lastRef = useRef(HOVER_IDLE)
   const itemsRef = useRef(items)
-  const geometryRef = useRef<RailGeometry>({
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    firstTop: 0,
-    rowPx: TICK_ROW_FALLBACK_PX
-  })
   itemsRef.current = items
 
   useEffect(() => {
     const nav = navRef.current
     if (!nav) return
 
-    let geometryRaf = 0
     let pickRaf = 0
     let x = 0
     let y = 0
@@ -542,7 +550,7 @@ function useTickHoverProximity(
       const list = itemsRef.current
       if (!list.length) return
 
-      const rail = geometryRef.current
+      const rail = readRailGeometry(nav)
       const inBand = y >= rail.top && y <= rail.bottom
       const pastRight = x - rail.right
       const inRail = inBand && x >= rail.left && x <= rail.right
@@ -578,7 +586,6 @@ function useTickHoverProximity(
         return
       }
 
-      // u=0 at the rail edge — closer pulls harder, still short of full until the rail.
       const u = pastRight / TICK_HOVER_SLOP_PX
       commit({ id, grow: TICK_APPROACH_GROW * (1 - u * u), inRail: false })
     }
@@ -588,15 +595,8 @@ function useTickHoverProximity(
     }
 
     const refresh = () => {
-      if (geometryRaf) return
-      geometryRaf = requestAnimationFrame(() => {
-        geometryRaf = 0
-        geometryRef.current = readRailGeometry(nav)
-        if (sawPointer) schedulePick()
-      })
+      if (sawPointer) schedulePick()
     }
-
-    geometryRef.current = readRailGeometry(nav)
 
     const observer = new ResizeObserver(refresh)
     observer.observe(nav)
@@ -625,16 +625,9 @@ function useTickHoverProximity(
       window.removeEventListener('chat-panel-resize-tick', refresh)
       window.removeEventListener('pointermove', onMove)
       document.removeEventListener('pointerout', onLeaveWindow)
-      if (geometryRaf) cancelAnimationFrame(geometryRaf)
       if (pickRaf) cancelAnimationFrame(pickRaf)
     }
   }, [navRef, setHover])
-
-  useEffect(() => {
-    const nav = navRef.current
-    if (!nav) return
-    geometryRef.current = readRailGeometry(nav)
-  }, [items.length, navRef])
 }
 
 function useChatRailReserve() {
@@ -677,8 +670,8 @@ function useChatRailReserve() {
     }
   }, [chatOpen])
 
-  if (!chatOpen) return 0
-  return dragHeight ?? stored
+  if (!chatOpen) return { height: 0, dragging: false }
+  return { height: dragHeight ?? stored, dragging: dragHeight != null }
 }
 
 function useRailViewport(navRef: RefObject<HTMLElement | null>, itemCount: number, chatH: number) {
@@ -859,11 +852,11 @@ export function TocTickRail({ onOpenWide }: { onOpenWide: () => void }) {
   const { items } = useToc()
   const navRef = useRef<HTMLElement>(null)
   const chatReserve = useChatRailReserve()
-  const viewport = useRailViewport(navRef, items.length, chatReserve)
+  const viewport = useRailViewport(navRef, items.length, chatReserve.height)
   const focusedHeadingId = useFocusedHeadingStore((s) => s.focusedHeadingId)
   const chatHeadingId = useChatStore((s) => s.chatRoom.headingId)
   const folded = useMemo(() => visibleRailItems(items), [items])
-  const maxTicks = maxRailTicks(viewport.height, viewport.viewH, chatReserve)
+  const maxTicks = maxRailTicks(viewport.height, viewport.viewH, chatReserve.height)
   const spyForFit = focusedHeadingId ?? chatHeadingId ?? null
   const visible = useMemo(
     () => fitRailItems(folded, maxTicks, spyForFit),
@@ -878,6 +871,12 @@ export function TocTickRail({ onOpenWide }: { onOpenWide: () => void }) {
     setHover(next)
   }, [])
   const { start, end } = railWindow(viewport.scrollTop, viewport.height, visible.length)
+  const stackH = visible.length * TICK_ROW_FALLBACK_PX
+  const stackOffset = railStackOffset(
+    liveRailHeight(viewport.height, viewport.viewH, chatReserve.height),
+    stackH
+  )
+  const [slideStack, setSlideStack] = useState(false)
   const [previewAnchor, setPreviewAnchor] = useState<HTMLElement | null>(null)
   const hoverIndex = hover.id ? visible.findIndex((item) => item.id === hover.id) : -1
   const reduced = prefersReducedMotion()
@@ -913,6 +912,16 @@ export function TocTickRail({ onOpenWide }: { onOpenWide: () => void }) {
     return () => window.clearTimeout(timer)
   }, [previewIntentId, reduced])
 
+  useLayoutEffect(() => {
+    if (reduced || chatReserve.dragging || viewport.height <= 0) {
+      if (chatReserve.dragging) setSlideStack(false)
+      return
+    }
+    if (slideStack) return
+    const id = window.requestAnimationFrame(() => setSlideStack(true))
+    return () => window.cancelAnimationFrame(id)
+  }, [chatReserve.dragging, reduced, slideStack, viewport.height])
+
   useTickHoverProximity(navRef, visible, setHoverAndRef)
   useRailSpyFollow(navRef, visible, hoverRef, spyTickId)
 
@@ -935,8 +944,16 @@ export function TocTickRail({ onOpenWide }: { onOpenWide: () => void }) {
         className="scrollbar-custom min-h-0 w-full flex-1 scrollbar-thin overflow-y-auto py-0.5">
         <div className="flex min-h-full flex-col">
           <div
-            className="relative w-full"
-            style={{ height: visible.length * TICK_ROW_FALLBACK_PX }}>
+            data-toc-rail-stack
+            className={twMerge(
+              'relative w-full',
+              slideStack &&
+                'motion-safe:transition-transform motion-safe:duration-[var(--motion-panel)] motion-safe:ease-out'
+            )}
+            style={{
+              height: stackH,
+              transform: `translateY(${stackOffset}px)`
+            }}>
             {visible.slice(start, end).map((item, offset) => {
               const index = start + offset
               const kind = tickKind({
