@@ -61,6 +61,14 @@ files you are editing, and the long-form docs in `.cursor/docs/`.
 When guidance overlaps, `AGENTS.md` and the area `CLAUDE.md` win; `.mdc` files are authoring
 reference.
 
+## Local working notes
+
+`Notes/` is gitignored. Untracked reports, briefs, and the hocuspocus backlog
+live in `Notes/local-docs/`. Open that folder's `INDEX.md` when the task is
+inject-content, Last left, occupancy, restore, REST gaps, scale, auth, composer,
+extension launch, or TOC rail. That index has a route-by-task table and a keyword list.
+Search with `grep -rl <pattern> Notes/local-docs/`.
+
 ## Simplified English is mandatory
 
 Every sentence an agent writes here is Simplified English. It binds chat replies, reports, code
