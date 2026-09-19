@@ -12,6 +12,56 @@ export const TOC_SNAP_WIDTH = 120
 
 type TocMode = 'wide' | 'rail' | 'drag' | 'settle-to-rail' | 'settle-to-wide'
 
+const rememberedWideWidth = (width: number): number =>
+  width > TOC_MIN_WIDTH ? width : TOC_DEFAULT_WIDTH
+
+type TocReleaseStep =
+  | { action: 'cancel' }
+  | {
+      action: 'apply'
+      mode: TocMode
+      paint: number
+      tocWidth: number | null
+      lastWide: number
+    }
+
+/** Intended drag + last-wide + clamp → next mode, Painted width, tocWidth. */
+export const stepTocRelease = (
+  intended: number | null,
+  lastWide: number,
+  dragMax: number,
+  reduced: boolean
+): TocReleaseStep => {
+  if (intended == null) return { action: 'cancel' }
+  if (intended < TOC_SNAP_WIDTH) {
+    const wide = rememberedWideWidth(lastWide)
+    return {
+      action: 'apply',
+      mode: reduced || intended <= TOC_RAIL_WIDTH ? 'rail' : 'settle-to-rail',
+      paint: TOC_RAIL_WIDTH,
+      tocWidth: wide,
+      lastWide: wide
+    }
+  }
+  const next = Math.min(dragMax, intended)
+  if (next <= TOC_MIN_WIDTH) {
+    return {
+      action: 'apply',
+      mode: 'wide',
+      paint: TOC_MIN_WIDTH,
+      tocWidth: null,
+      lastWide
+    }
+  }
+  return {
+    action: 'apply',
+    mode: 'wide',
+    paint: next,
+    tocWidth: next,
+    lastWide: next
+  }
+}
+
 export const getTocMaxWidth = (containerWidth: number): number => {
   if (containerWidth <= 0) return TOC_DEFAULT_WIDTH
   return Math.max(TOC_MIN_WIDTH, Math.floor(containerWidth * TOC_MAX_WIDTH_RATIO))
@@ -57,9 +107,6 @@ const persistTocWidth = (width: number) => {
   }
 }
 
-const rememberedWideWidth = (width: number): number =>
-  width > TOC_MIN_WIDTH ? width : TOC_DEFAULT_WIDTH
-
 const clearResizeCursor = () => {
   document.body.style.userSelect = ''
   document.body.style.cursor = ''
@@ -85,12 +132,19 @@ export const useTocResize = () => {
   modeRef.current = mode
   const isRail = mode === 'rail'
   const isResizing = mode === 'drag'
+  const isSettlingToRail = mode === 'settle-to-rail'
   const isContentHidden =
     mode === 'settle-to-rail' ||
     mode === 'settle-to-wide' ||
     (mode === 'drag' && paint < TOC_MIN_WIDTH)
 
   const reduced = prefersReducedMotion()
+
+  const focusWideToc = useCallback(() => {
+    const root = tocRef.current
+    const next = root?.querySelector<HTMLElement>('a[href], button:not([disabled])')
+    next?.focus({ preventScroll: true })
+  }, [])
 
   const clampCurrentWidthToContainer = useCallback(() => {
     if (modeRef.current !== 'wide' && modeRef.current !== 'settle-to-wide') return
@@ -142,21 +196,28 @@ export const useTocResize = () => {
     if (mode !== 'settle-to-rail' && mode !== 'settle-to-wide') return
     if (mode === 'settle-to-wide' && paint === TOC_RAIL_WIDTH) return
     const nextMode = mode === 'settle-to-rail' ? 'rail' : 'wide'
-    const fallback = window.setTimeout(() => setMode(nextMode), MOTION_OVERLAY_IN_MS + 50)
+    let done = false
+    const finish = () => {
+      if (done) return
+      done = true
+      setMode(nextMode)
+      if (nextMode === 'wide') window.setTimeout(focusWideToc, 0)
+    }
+    const fallback = window.setTimeout(finish, MOTION_OVERLAY_IN_MS + 50)
     const el = tocRef.current
     if (!el) return () => window.clearTimeout(fallback)
 
     const onEnd = (event: TransitionEvent) => {
       if (event.target !== el) return
       if (event.propertyName !== 'width') return
-      setMode(nextMode)
+      finish()
     }
     el.addEventListener('transitionend', onEnd)
     return () => {
       el.removeEventListener('transitionend', onEnd)
       window.clearTimeout(fallback)
     }
-  }, [mode, paint])
+  }, [focusWideToc, mode, paint])
 
   useEffect(() => {
     if (mode !== 'settle-to-wide') return
@@ -191,29 +252,23 @@ export const useTocResize = () => {
     document.removeEventListener('mouseup', handleMouseUp)
     document.removeEventListener('pointercancel', handleMouseUp)
 
-    if (intended == null) {
+    const step = stepTocRelease(
+      intended,
+      lastWideWidthRef.current,
+      dragMaxWidthRef.current,
+      reduced
+    )
+    if (step.action === 'cancel') {
       setMode('wide')
       return
     }
-    if (intended < TOC_SNAP_WIDTH) {
-      const wide = rememberedWideWidth(lastWideWidthRef.current)
-      lastWideWidthRef.current = wide
-      setTocWidth(wide)
-      persistTocWidth(wide)
-      setPaint(TOC_RAIL_WIDTH)
-      setMode(reduced || intended <= TOC_RAIL_WIDTH ? 'rail' : 'settle-to-rail')
-      return
+    lastWideWidthRef.current = step.lastWide
+    if (step.tocWidth != null) {
+      setTocWidth(step.tocWidth)
+      persistTocWidth(step.tocWidth)
     }
-    const next = Math.min(dragMaxWidthRef.current, intended)
-    if (next <= TOC_MIN_WIDTH) {
-      setPaint(TOC_MIN_WIDTH)
-      setMode('wide')
-      return
-    }
-    lastWideWidthRef.current = next
-    setTocWidth(next)
-    setPaint(next)
-    setMode('wide')
+    setPaint(step.paint)
+    setMode(step.mode)
   }, [handleMouseMove, reduced])
 
   const handleMouseDown = useCallback(
@@ -252,17 +307,19 @@ export const useTocResize = () => {
     if (reduced) {
       setPaint(wide)
       setMode('wide')
+      window.setTimeout(focusWideToc, 0)
       return
     }
     setPaint(TOC_RAIL_WIDTH)
     setMode('settle-to-wide')
-  }, [reduced])
+  }, [focusWideToc, reduced])
 
   return {
     tocRef,
     paintedWidth: paint,
     isResizing,
     isRail,
+    isSettlingToRail,
     isContentHidden,
     handleMouseDown,
     openWide

@@ -66,7 +66,7 @@ reference.
 `Notes/` is gitignored. Untracked reports, briefs, and the hocuspocus backlog
 live in `Notes/local-docs/`. Open that folder's `INDEX.md` when the task is
 inject-content, Last left, occupancy, restore, REST gaps, scale, auth, composer,
-extension launch, or TOC rail. That index has a route-by-task table and a keyword list.
+extension launch, TOC rail, or chat sash. That index has a route-by-task table and a keyword list.
 Search with `grep -rl <pattern> Notes/local-docs/`.
 
 ## Simplified English is mandatory

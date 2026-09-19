@@ -16,7 +16,7 @@ Entry point for Claude Code working on **docs.plus**. Read [AGENTS.md](AGENTS.md
 3. **Package-local `AGENTS.md`** when working inside a package (e.g. [extensions/extension-hyperlink/AGENTS.md](extensions/extension-hyperlink/AGENTS.md)). Read in addition to the above.
 4. The relevant `.cursor/rules/*.mdc` for the file you are editing (see index below).
 
-Durable memory is at `.agents/memory/` (gitignored symlink to the Claude Code store, shared with Cursor); `.agents/memory/MEMORY.md` is the index. **Cursor does not read `CLAUDE.md`** — it gets the same rules through [.cursor/rules/agent-rules-and-memory.mdc](.cursor/rules/agent-rules-and-memory.mdc). Keep that map current when a rule file moves. Local working notes live in `Notes/` (gitignored). Current reports sit in `Notes/local-docs/`. Start at that folder's `INDEX.md`. Open it for inject-content, Last left, occupancy, restore, REST gaps, scale, auth, composer, extension launch, or TOC rail.
+Durable memory is at `.agents/memory/` (gitignored symlink to the Claude Code store, shared with Cursor); `.agents/memory/MEMORY.md` is the index. **Cursor does not read `CLAUDE.md`** — it gets the same rules through [.cursor/rules/agent-rules-and-memory.mdc](.cursor/rules/agent-rules-and-memory.mdc). Keep that map current when a rule file moves. Local working notes live in `Notes/` (gitignored). Current reports sit in `Notes/local-docs/`. Start at that folder's `INDEX.md`. Open it for inject-content, Last left, occupancy, restore, REST gaps, scale, auth, composer, extension launch, TOC rail, or chat sash.
 
 If guidance overlaps, project policy in `AGENTS.md` and `.cursor/docs/` wins; `.mdc` files are reference material for authoring.
 

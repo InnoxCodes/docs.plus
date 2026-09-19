@@ -102,21 +102,12 @@ function visibleRailItems(items: TocItem[]): TocItem[] {
   return out
 }
 
-function railNavLooksStale(navH: number, viewH: number): boolean {
-  const vh = viewH > 0 ? viewH : navH
-  return navH <= 0 || (vh > 0 && navH > vh * RAIL_MAX_VIEWPORT_RATIO - TICK_ROW_FALLBACK_PX * 3)
-}
-
-function maxRailTicks(navH: number, viewH: number, chatH: number) {
+function maxRailTicks(navH: number, viewH: number) {
   const vh = viewH > 0 ? viewH : window.innerHeight
   if (vh <= 0 && navH <= 0) return Number.POSITIVE_INFINITY
   const viewCap = vh > 0 ? vh * RAIL_MAX_VIEWPORT_RATIO : navH
   const measured = navH > 0 ? Math.min(navH, viewCap) : viewCap
-  // Chat writes `--chat-panel-height` in a later effect. Nav can still read
-  // the full pad for one frame, so subtract chat until the rail has shrunk.
-  const staleOpen = chatH > 0 && railNavLooksStale(navH, vh)
-  const budget = staleOpen ? Math.max(TICK_ROW_FALLBACK_PX, measured - chatH) : measured
-  return Math.max(1, Math.floor(budget / TICK_ROW_FALLBACK_PX))
+  return Math.max(1, Math.floor(measured / TICK_ROW_FALLBACK_PX))
 }
 
 function deepestKeptLevel(items: TocItem[], maxTicks: number) {
@@ -201,13 +192,6 @@ function railWindow(scrollTop: number, height: number, count: number) {
   const start = Math.max(0, Math.floor(scrollTop / row) - overscan)
   const end = Math.min(count, Math.ceil((scrollTop + (height || 640)) / row) + overscan)
   return { start, end }
-}
-
-function liveRailHeight(navH: number, viewH: number, chatH: number): number {
-  if (chatH <= 0) return Math.max(0, navH)
-  const vh = viewH > 0 ? viewH : navH
-  if (railNavLooksStale(navH, vh)) return Math.max(0, (navH > 0 ? navH : vh) - chatH)
-  return navH
 }
 
 function railStackOffset(railH: number, stackH: number): number {
@@ -632,49 +616,30 @@ function useTickHoverProximity(
 
 function useChatRailReserve() {
   const chatOpen = useChatStore((s) => Boolean(s.chatRoom.headingId))
-  const stored = useChatStore((s) => s.chatRoom.panelHeight)
-  const [dragHeight, setDragHeight] = useState<number | null>(null)
+  const [dragging, setDragging] = useState(false)
 
   useEffect(() => {
     if (!chatOpen) {
-      setDragHeight(null)
+      setDragging(false)
       return
     }
 
-    let raf = 0
-    let pending: number | null = null
-    const flush = () => {
-      raf = 0
-      if (pending == null) return
-      setDragHeight(pending)
-      pending = null
+    const onTick = () => {
+      setDragging((was) => was || true)
     }
-    const onTick = (event: Event) => {
-      const height = (event as CustomEvent<number>).detail
-      if (typeof height !== 'number') return
-      pending = height
-      if (!raf) raf = requestAnimationFrame(flush)
-    }
-    const onEnd = () => {
-      if (raf) cancelAnimationFrame(raf)
-      raf = 0
-      pending = null
-      setDragHeight(null)
-    }
+    const onEnd = () => setDragging(false)
     window.addEventListener('chat-panel-resize-tick', onTick)
     window.addEventListener('chat-panel-resize-end', onEnd)
     return () => {
       window.removeEventListener('chat-panel-resize-tick', onTick)
       window.removeEventListener('chat-panel-resize-end', onEnd)
-      if (raf) cancelAnimationFrame(raf)
     }
   }, [chatOpen])
 
-  if (!chatOpen) return { height: 0, dragging: false }
-  return { height: dragHeight ?? stored, dragging: dragHeight != null }
+  return { dragging: chatOpen && dragging }
 }
 
-function useRailViewport(navRef: RefObject<HTMLElement | null>, itemCount: number, chatH: number) {
+function useRailViewport(navRef: RefObject<HTMLElement | null>, itemCount: number) {
   const [viewport, setViewport] = useState({ scrollTop: 0, height: 0, viewH: 0 })
 
   useLayoutEffect(() => {
@@ -724,7 +689,7 @@ function useRailViewport(navRef: RefObject<HTMLElement | null>, itemCount: numbe
       observer.disconnect()
       if (raf) cancelAnimationFrame(raf)
     }
-  }, [chatH, itemCount, navRef])
+  }, [itemCount, navRef])
 
   return viewport
 }
@@ -852,11 +817,11 @@ export function TocTickRail({ onOpenWide }: { onOpenWide: () => void }) {
   const { items } = useToc()
   const navRef = useRef<HTMLElement>(null)
   const chatReserve = useChatRailReserve()
-  const viewport = useRailViewport(navRef, items.length, chatReserve.height)
+  const viewport = useRailViewport(navRef, items.length)
   const focusedHeadingId = useFocusedHeadingStore((s) => s.focusedHeadingId)
   const chatHeadingId = useChatStore((s) => s.chatRoom.headingId)
   const folded = useMemo(() => visibleRailItems(items), [items])
-  const maxTicks = maxRailTicks(viewport.height, viewport.viewH, chatReserve.height)
+  const maxTicks = maxRailTicks(viewport.height, viewport.viewH)
   const spyForFit = focusedHeadingId ?? chatHeadingId ?? null
   const visible = useMemo(
     () => fitRailItems(folded, maxTicks, spyForFit),
@@ -872,10 +837,7 @@ export function TocTickRail({ onOpenWide }: { onOpenWide: () => void }) {
   }, [])
   const { start, end } = railWindow(viewport.scrollTop, viewport.height, visible.length)
   const stackH = visible.length * TICK_ROW_FALLBACK_PX
-  const stackOffset = railStackOffset(
-    liveRailHeight(viewport.height, viewport.viewH, chatReserve.height),
-    stackH
-  )
+  const stackOffset = railStackOffset(viewport.height, stackH)
   const [slideStack, setSlideStack] = useState(false)
   const [previewAnchor, setPreviewAnchor] = useState<HTMLElement | null>(null)
   const hoverIndex = hover.id ? visible.findIndex((item) => item.id === hover.id) : -1

@@ -8,7 +8,7 @@ import { useUnreadSync } from '@hooks/useUnreadSync'
 import { memo, type RefObject, useRef } from 'react'
 import { twMerge } from 'tailwind-merge'
 
-import { useAdjustEditorSizeForChatRoom, useTocResize } from '../hooks'
+import { useSyncChatPanelHeight, useTocResize } from '../hooks'
 import EditorContent from './EditorContent'
 import TOC from './Toc'
 
@@ -17,6 +17,7 @@ const DesktopPadEditor = memo(function DesktopPadEditor({
 }: {
   wrapperRef: RefObject<HTMLDivElement | null>
 }) {
+  useSyncChatPanelHeight(wrapperRef)
   return (
     <div
       ref={wrapperRef}
@@ -52,10 +53,19 @@ const DesktopPadChat = memo(function DesktopPadChat() {
 const DesktopEditor = () => {
   const editorWrapperRef = useRef<HTMLDivElement>(null)
 
-  const { tocRef, paintedWidth, isResizing, isRail, isContentHidden, handleMouseDown, openWide } =
-    useTocResize()
+  const {
+    tocRef,
+    paintedWidth,
+    isResizing,
+    isRail,
+    isSettlingToRail,
+    isContentHidden,
+    handleMouseDown,
+    openWide
+  } = useTocResize()
 
-  useAdjustEditorSizeForChatRoom(editorWrapperRef)
+  const tocHeightClass =
+    isRail || isSettlingToRail ? 'h-[calc(100%-var(--chat-panel-height,0px))]' : 'h-full'
 
   useUnreadSync()
 
@@ -65,9 +75,10 @@ const DesktopEditor = () => {
     <div
       ref={tocRef}
       className={twMerge(
-        'tableOfContents relative z-[42] h-full max-h-full min-h-0 min-w-0 shrink-0 bg-[var(--pad-well)]',
+        'tableOfContents relative z-[42] max-h-full min-h-0 min-w-0 shrink-0 bg-[var(--pad-well)]',
+        tocHeightClass,
         !isResizing &&
-          'motion-safe:transition-[width] motion-safe:duration-[var(--motion-overlay-in)] motion-safe:ease-out'
+          'motion-safe:transition-[width,height] motion-safe:duration-[var(--motion-overlay-in)] motion-safe:ease-out'
       )}
       style={{
         width: paintedWidth,

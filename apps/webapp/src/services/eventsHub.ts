@@ -1,16 +1,28 @@
 import { useChatStore } from '@stores'
 import { ensureEmojiData } from '@utils/ensureEmojiData'
 import { removeFilterSegment, resetFilterPath, shallowPathFromAsPath } from '@utils/filterRoute'
+import { stripChatDeepLinkFromBrowserUrl } from '@utils/stripChatDeepLinkFromUrl'
 import { NextRouter } from 'next/router'
 import PubSub from 'pubsub-js'
 
 import { CHAT_COMMENT, type TChatCommentData } from './chatEvents'
-import { openCommentComposer, openHeadingChatBrowse } from './openHeadingChatroom'
+import {
+  focusHeadingChatTrigger,
+  openCommentComposer,
+  openHeadingChatBrowse
+} from './openHeadingChatroom'
 
 export { CHAT_COMMENT, type TChatCommentData } from './chatEvents'
 
 export const CHAT_OPEN = Symbol('chat.open')
 export const CHAT_CLOSE = Symbol('chat.close')
+
+export function closeHeadingChatroom(): void {
+  const headingId = useChatStore.getState().chatRoom.headingId
+  PubSub.publish(CHAT_CLOSE, { headingId })
+  stripChatDeepLinkFromBrowserUrl(headingId)
+}
+
 export const APPLY_FILTER = Symbol('apply.filter')
 export const REMOVE_FILTER = Symbol('remove.filter')
 export const RESET_FILTER = Symbol('reset.filter')
@@ -63,7 +75,7 @@ export const eventsHub = (router: NextRouter) => {
       // seeds expanded. A second subscriber (or a later tap) must not treat that
       // as a toggle-close. The 200ms open delay used to hide this.
       if (openedHeadingId === headingId && toggleRoom && paneMode !== 'closed') {
-        useChatStore.getState().destroyChatRoom()
+        closeHeadingChatroom()
         return
       }
 
@@ -91,6 +103,7 @@ export const eventsHub = (router: NextRouter) => {
         setEditMessageMemory(headingId, null)
       }
       destroyChatRoom()
+      focusHeadingChatTrigger(headingId)
     }),
 
     PubSub.subscribe(APPLY_FILTER, (_msg, data: TApplyFilterData) => {

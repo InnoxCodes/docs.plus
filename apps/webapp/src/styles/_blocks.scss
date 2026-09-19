@@ -4,7 +4,7 @@
     overflow: auto;
 
     .editorWrapper {
-      padding-bottom: 300px;
+      padding-bottom: calc(300px + var(--chat-panel-height, 0px));
       // Heading chat/comment buttons straddle the sheet edge — need visible + extra end gutter
       overflow-x: visible;
       padding-inline-end: calc(0.75rem + 1.5rem);

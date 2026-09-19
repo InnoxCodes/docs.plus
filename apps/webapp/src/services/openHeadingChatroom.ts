@@ -23,6 +23,18 @@ export function destroyChatRoomForHistory(): void {
   if (chatRoom.headingId) destroyChatRoom()
 }
 
+export function focusHeadingChatTrigger(headingId: string | undefined): void {
+  if (!headingId) return
+  const id = CSS.escape(headingId)
+  const trigger =
+    document.querySelector<HTMLElement>(`.toc__chat-trigger[data-heading-id="${id}"]`) ??
+    document.querySelector<HTMLElement>('[aria-label="Show table of contents"]') ??
+    document.querySelector<HTMLElement>(
+      '.tableOfContents button:not([disabled]), .tableOfContents a[href]'
+    )
+  trigger?.focus({ preventScroll: true })
+}
+
 /** Sheet-open variant: only acts when the keyboard is up, avoiding a redundant blur. */
 export function exitDocEditModeForSheet(): void {
   if (!useStore.getState().isKeyboardOpen) return
