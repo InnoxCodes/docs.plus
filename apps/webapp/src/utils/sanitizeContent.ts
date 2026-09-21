@@ -7,6 +7,7 @@ const MESSAGE_HTML_PURIFY = {
     'strong',
     'em',
     'u',
+    's',
     'a',
     'ul',
     'ol',

@@ -128,6 +128,8 @@ export const useTiptapEditor = ({
           code: false, // Disable default code to use our custom InlineCode extension
           codeBlock: false,
           listKeymap: false,
+          heading: false, // The message allowlist has no h1-h6, so send would strip the heading.
+          horizontalRule: false, // The message allowlist has no hr, so send would drop the rule.
           bulletList: {
             keepMarks: true,
             keepAttributes: false // TODO: keepAttributes:true loses marks; investigating upstream.
