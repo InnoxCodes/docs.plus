@@ -49,6 +49,8 @@ export type PrepareOutboundSuccess = { ok: true } & PreparedOutboundContent
 
 export type PrepareOutboundResult = PrepareOutboundSuccess | PrepareOutboundError
 
+const MESSAGE_ROW_LIMIT = 3000
+
 const clearsComposerBeforeSend = (
   htmlChunkCount: number,
   editMessageMemory: ComposerMessageMemory | null | undefined
@@ -85,11 +87,15 @@ export function prepareOutboundContent(
 
     const sanitizedHtml = sanitized.sanitizedHtml ?? ''
     const sanitizedText = sanitized.sanitizedText ?? ''
-    const chunks = chunkHtmlContent(sanitizedHtml, 3000)
+    const chunks = chunkHtmlContent(sanitizedHtml, MESSAGE_ROW_LIMIT)
     const htmlChunks = chunks.htmlChunks
     const textChunks = chunks.textChunks
 
-    if (hasAttachments && htmlChunks.length > 1) {
+    const fitsOneRow = sanitizedHtml.length <= MESSAGE_ROW_LIMIT
+    if (editMessageMemory && !fitsOneRow) {
+      return { ok: false, error: 'Edited messages cannot be over 3,000 characters' }
+    }
+    if (hasAttachments && !fitsOneRow) {
       return {
         ok: false,
         error: 'Attachments cannot be sent with messages over 3,000 characters'
