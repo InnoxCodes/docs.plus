@@ -1,6 +1,16 @@
+import {
+  composerAttachmentKey,
+  selectComposerAttachmentsByKey,
+  useComposerAttachmentsStore
+} from '@components/chatroom/stores/composerAttachmentsStore'
 import { getHyperlinkPopoverConfigAtInvoke } from '@components/TipTap/hyperlinkPopovers/getHyperlinkPopoverConfig'
 import { ListKeymapWithoutTab } from '@components/TipTap/listKeymapWithoutTab'
-import { getComposerState, syncComposerDraft } from '@db/messageComposerDB'
+import {
+  type ComposerState,
+  flushPendingWrites,
+  getComposerState,
+  syncComposerDraft
+} from '@db/messageComposerDB'
 import { Hyperlink } from '@docs.plus/extension-hyperlink'
 import { Indent } from '@docs.plus/extension-indent'
 import { InlineCode } from '@docs.plus/extension-inline-code'
@@ -28,6 +38,7 @@ import { isMentionSuggestionPopupVisible } from '../helpers/mentionTypes'
 import suggestion from '../helpers/suggestion'
 import { isComposerLinkDialogOpen } from '../stores/composerLinkDialogStore'
 import { snapshotComposerLinkSelection } from '../stores/composerLinkSelectionRef'
+import { readyAttachmentsToDraft } from './useComposerAttachmentDraft'
 const lowlight = createLowlight()
 lowlight.register('html', html)
 lowlight.register('css', css)
@@ -98,7 +109,6 @@ export const useTiptapEditor = ({
   /** Chatroom surface — not `settings.editor.isMobile`, which is set in an effect after first paint. */
   isComposerMobile?: boolean
 }) => {
-  const [html, setHtml] = useState('')
   const [text, setText] = useState('')
   const [isEmojiOnly, setIsEmojiOnly] = useState(false)
   const updateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -184,19 +194,29 @@ export const useTiptapEditor = ({
           updateTimerRef.current = null
           const text = editor?.getText() ?? ''
           const html = editor?.getHTML() ?? ''
-          setHtml(html)
           setText(text)
           setIsEmojiOnly(isOnlyEmoji(text))
 
           const ctx = draftCtxRef.current
           if (draftHydratedRef.current && ctx.workspaceId && ctx.channelId) {
-            void getComposerState(ctx.workspaceId, ctx.channelId).then((existing) => {
-              syncComposerDraft(ctx.workspaceId!, ctx.channelId!, {
-                text,
-                html,
-                attachments: existing?.attachments
-              })
-            })
+            const memory = useChatStore.getState().workspaceSettings.channels.get(ctx.channelId)
+            // Edit and comment text is not the unsent draft.
+            if (memory?.editMessageMemory || memory?.commentMessageMemory) return
+            const save = (attachments?: ComposerState['attachments']) =>
+              syncComposerDraft(ctx.workspaceId!, ctx.channelId!, { text, html, attachments })
+            if (memory?.replyMessageMemory) {
+              // A queued attachment write lands first, so this write keeps its attachments.
+              flushPendingWrites()
+              void getComposerState(ctx.workspaceId, ctx.channelId).then((row) =>
+                save(row?.attachments)
+              )
+            } else {
+              const draftKey = composerAttachmentKey(ctx.workspaceId, ctx.channelId)
+              const draft = selectComposerAttachmentsByKey(draftKey)(
+                useComposerAttachmentsStore.getState()
+              )
+              save(readyAttachmentsToDraft(draft))
+            }
           }
         }, UPDATE_DEBOUNCE_MS)
       },
@@ -281,7 +301,6 @@ export const useTiptapEditor = ({
 
   return {
     editor,
-    html,
     text,
     isEmojiOnly,
     setIsEmojiOnly,

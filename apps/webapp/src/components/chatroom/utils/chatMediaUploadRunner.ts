@@ -111,6 +111,7 @@ export class ChatMediaUploadRunner {
   }
 
   cancel(id: string) {
+    this.pendingQueue = this.pendingQueue.filter((entry) => entry.id !== id)
     this.activeIds.delete(id)
     this.abortControllers.get(id)?.abort()
     this.abortControllers.delete(id)

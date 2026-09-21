@@ -1,14 +1,20 @@
 import {
+  type ComposerAttachment,
   composerAttachmentKey,
+  composerEditAttachmentKey,
   deleteNonPersistedAttachmentStorage,
-  disposeComposerAttachmentsForKey,
+  selectComposerAttachmentsByKey,
   useComposerAttachmentsStore
 } from '@components/chatroom/stores/composerAttachmentsStore'
 import { validateChatMediaFile } from '@components/chatroom/utils/chatMediaMime'
 import { ChatMediaUploadRunner } from '@components/chatroom/utils/chatMediaUploadRunner'
-import { CHAT_MEDIA_MAX_ATTACHMENTS } from '@components/chatroom/utils/messageMediaPaths'
+import {
+  CHAT_MEDIA_MAX_ATTACHMENTS,
+  mediaStoragePath
+} from '@components/chatroom/utils/messageMediaPaths'
 import { deleteChatMediaFromStorage } from '@components/chatroom/utils/uploadChatMedia'
 import * as toast from '@components/toast'
+import { useChatStore } from '@stores'
 import type { MessageMediaItem } from '@types'
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 
@@ -29,7 +35,12 @@ export const useComposerAttachments = ({
   userId,
   disabled = false
 }: Args) => {
-  const storeKey = workspaceId ? composerAttachmentKey(workspaceId, channelId) : channelId
+  const draftKey = composerAttachmentKey(workspaceId, channelId)
+  const editKey = composerEditAttachmentKey(draftKey)
+  const editing = useChatStore((state) =>
+    Boolean(state.workspaceSettings.channels.get(channelId)?.editMessageMemory)
+  )
+  const activeKey = editing ? editKey : draftKey
   const attachments = useComposerAttachmentList(workspaceId, channelId)
   const setAttachments = useComposerAttachmentsStore((state) => state.setAttachments)
   const pushRemovedPersistedPath = useComposerAttachmentsStore(
@@ -41,77 +52,106 @@ export const useComposerAttachments = ({
   const resetRemovedPersistedPaths = useComposerAttachmentsStore(
     (state) => state.resetRemovedPersistedPaths
   )
-  const pruneExceptKey = useComposerAttachmentsStore((state) => state.pruneExceptKey)
+  const pushModeAddedId = useComposerAttachmentsStore((state) => state.pushModeAddedId)
+  const takeModeAddedIds = useComposerAttachmentsStore((state) => state.takeModeAddedIds)
+  const pruneExceptKeys = useComposerAttachmentsStore((state) => state.pruneExceptKeys)
 
-  const uploadRunnerRef = useRef<ChatMediaUploadRunner | null>(null)
+  const draftRunnerRef = useRef<ChatMediaUploadRunner | null>(null)
+  const editRunnerRef = useRef<ChatMediaUploadRunner | null>(null)
+  const activeRunnerRef = editing ? editRunnerRef : draftRunnerRef
   const attachmentsRef = useRef(attachments)
   attachmentsRef.current = attachments
 
+  // Keep `editing` out of the deps: a re-run disposes the draft runner and stops its uploads.
   useEffect(() => {
     if (!userId) return
-    const runner = new ChatMediaUploadRunner({
-      userId,
-      channelId,
-      setAttachments: (next) => setAttachments(storeKey, next)
-    })
-    uploadRunnerRef.current = runner
-    return () => {
-      runner.dispose()
-      uploadRunnerRef.current = null
+    const runnerFor = (key: string) =>
+      new ChatMediaUploadRunner({
+        userId,
+        channelId,
+        setAttachments: (next) => setAttachments(key, next)
+      })
+    const draftRunner = runnerFor(draftKey)
+    const editRunner = runnerFor(editKey)
+    draftRunnerRef.current = draftRunner
+    editRunnerRef.current = editRunner
+    // The last mount's runner stopped these uploads, and nothing else can finish them.
+    const draft = selectComposerAttachmentsByKey(draftKey)(useComposerAttachmentsStore.getState())
+    for (const entry of draft) {
+      if (entry.status === 'uploading' && entry.file) draftRunner.enqueue(entry.id, entry.file)
     }
-  }, [channelId, setAttachments, storeKey, userId])
+    return () => {
+      draftRunner.dispose()
+      editRunner.dispose()
+      draftRunnerRef.current = null
+      editRunnerRef.current = null
+    }
+  }, [channelId, setAttachments, draftKey, editKey, userId])
 
   const removeAttachment = useCallback(
     (id: string) => {
       const attachment = attachmentsRef.current.find((entry) => entry.id === id)
       if (attachment) {
-        uploadRunnerRef.current?.deleteReadyAttachment(attachment, (path) =>
-          pushRemovedPersistedPath(storeKey, path)
+        activeRunnerRef.current?.deleteReadyAttachment(attachment, (path) =>
+          pushRemovedPersistedPath(activeKey, path)
         )
       }
-      setAttachments(storeKey, (prev) => prev.filter((entry) => entry.id !== id))
+      setAttachments(activeKey, (prev) => prev.filter((entry) => entry.id !== id))
     },
-    [pushRemovedPersistedPath, setAttachments, storeKey]
+    [activeKey, activeRunnerRef, pushRemovedPersistedPath, setAttachments]
   )
 
-  const clearAttachments = useCallback(
-    (options?: { deleteStorage?: boolean }) => {
-      const deleteStorage = options?.deleteStorage ?? true
-      if (deleteStorage) deleteNonPersistedAttachmentStorage(attachmentsRef.current)
-      uploadRunnerRef.current?.reset()
-      resetRemovedPersistedPaths(storeKey)
-      setAttachments(storeKey, [])
+  const clearAttachments = useCallback(() => {
+    activeRunnerRef.current?.reset()
+    resetRemovedPersistedPaths(activeKey)
+    setAttachments(activeKey, [])
+  }, [activeKey, activeRunnerRef, resetRemovedPersistedPaths, setAttachments])
+
+  // The outbound message owns these uploads now, so they leave the strip undeleted,
+  // and the upload runner is not reset. The undo returns them when no feed row took the message.
+  const releaseSentAttachments = useCallback(
+    (sent: MessageMediaItem[]) => {
+      const sentPaths = new Set(sent.map(mediaStoragePath))
+      const isSent = (entry: ComposerAttachment) => {
+        const path = entry.item ? mediaStoragePath(entry.item) : null
+        return path != null && sentPaths.has(path)
+      }
+      let released: ComposerAttachment[] = []
+      setAttachments(draftKey, (prev) => {
+        released = prev.filter(isSent)
+        return released.length > 0 ? prev.filter((entry) => !isSent(entry)) : prev
+      })
+      return () => setAttachments(draftKey, (prev) => [...released, ...prev])
     },
-    [resetRemovedPersistedPaths, setAttachments, storeKey]
+    [setAttachments, draftKey]
   )
 
-  const resetAttachmentUi = useCallback(() => {
-    uploadRunnerRef.current?.reset()
-    resetRemovedPersistedPaths(storeKey)
-    setAttachments(storeKey, [])
-  }, [resetRemovedPersistedPaths, setAttachments, storeKey])
+  const discardModeAttachments = useCallback(() => {
+    const ids = new Set(takeModeAddedIds(draftKey))
+    if (ids.size === 0) return
+    for (const id of ids) draftRunnerRef.current?.cancel(id)
+    const draft = selectComposerAttachmentsByKey(draftKey)(useComposerAttachmentsStore.getState())
+    deleteNonPersistedAttachmentStorage(draft.filter((entry) => ids.has(entry.id)))
+    setAttachments(draftKey, (prev) => prev.filter((entry) => !ids.has(entry.id)))
+  }, [draftKey, setAttachments, takeModeAddedIds])
 
   const cancelEditAttachments = useCallback(() => {
-    deleteNonPersistedAttachmentStorage(attachmentsRef.current)
-    resetAttachmentUi()
-  }, [resetAttachmentUi])
+    deleteNonPersistedAttachmentStorage(
+      selectComposerAttachmentsByKey(editKey)(useComposerAttachmentsStore.getState())
+    )
+    editRunnerRef.current?.reset()
+    resetRemovedPersistedPaths(editKey)
+    setAttachments(editKey, [])
+  }, [editKey, resetRemovedPersistedPaths, setAttachments])
 
   useEffect(() => {
-    const staleKeys = Object.keys(useComposerAttachmentsStore.getState().byKey).filter(
-      (key) => key !== storeKey
-    )
-    for (const key of staleKeys) {
-      disposeComposerAttachmentsForKey(key)
-    }
-
-    pruneExceptKey(storeKey)
-    uploadRunnerRef.current?.reset()
-    resetRemovedPersistedPaths(storeKey)
-  }, [channelId, workspaceId, pruneExceptKey, resetRemovedPersistedPaths, storeKey])
+    pruneExceptKeys([draftKey, editKey])
+  }, [draftKey, editKey, pruneExceptKeys])
 
   const addFiles = useCallback(
     (files: FileList | File[]) => {
-      if (disabled || !userId || !uploadRunnerRef.current) return
+      const runner = activeRunnerRef.current
+      if (disabled || !userId || !runner) return
 
       const incoming = Array.from(files)
       const slotsLeft = CHAT_MEDIA_MAX_ATTACHMENTS - attachmentsRef.current.length
@@ -125,24 +165,28 @@ export const useComposerAttachments = ({
         )
       }
 
+      const memory = useChatStore.getState().workspaceSettings.channels.get(channelId)
+      const addedInMode = Boolean(memory?.replyMessageMemory || memory?.commentMessageMemory)
       for (const file of incoming.slice(0, slotsLeft)) {
         const validationError = validateChatMediaFile(file)
         if (validationError) {
           toast.Error(validationError)
           continue
         }
-        uploadRunnerRef.current.enqueue(crypto.randomUUID(), file)
+        const id = crypto.randomUUID()
+        if (addedInMode) pushModeAddedId(draftKey, id)
+        runner.enqueue(id, file)
       }
     },
-    [disabled, userId]
+    [activeRunnerRef, channelId, disabled, draftKey, pushModeAddedId, userId]
   )
 
   const loadExistingAttachments = useCallback(
     (items: MessageMediaItem[]) => {
-      uploadRunnerRef.current?.reset()
-      resetRemovedPersistedPaths(storeKey)
+      editRunnerRef.current?.reset()
+      resetRemovedPersistedPaths(editKey)
       setAttachments(
-        storeKey,
+        editKey,
         items.map((item) => ({
           id: crypto.randomUUID(),
           item,
@@ -152,25 +196,26 @@ export const useComposerAttachments = ({
         }))
       )
     },
-    [resetRemovedPersistedPaths, setAttachments, storeKey]
+    [editKey, resetRemovedPersistedPaths, setAttachments]
   )
 
   const flushRemovedPersistedStorage = useCallback(() => {
-    for (const path of takeRemovedPersistedPaths(storeKey)) {
+    for (const path of takeRemovedPersistedPaths(editKey)) {
       void deleteChatMediaFromStorage({ url: path, path, type: 'file' })
     }
-  }, [storeKey, takeRemovedPersistedPaths])
+  }, [editKey, takeRemovedPersistedPaths])
 
   const retryAttachment = useCallback(
     (id: string) => {
-      if (disabled || !userId || !uploadRunnerRef.current) return
+      const runner = activeRunnerRef.current
+      if (disabled || !userId || !runner) return
 
       const attachment = attachmentsRef.current.find((entry) => entry.id === id)
       if (!attachment?.file || attachment.status !== 'error') return
 
-      uploadRunnerRef.current.enqueue(id, attachment.file)
+      runner.enqueue(id, attachment.file)
     },
-    [disabled, userId]
+    [activeRunnerRef, disabled, userId]
   )
 
   const hasReadyAttachments = useMemo(
@@ -208,13 +253,13 @@ export const useComposerAttachments = ({
 
   const toggleAttachmentSpoiler = useCallback(
     (id: string) => {
-      setAttachments(storeKey, (prev) =>
+      setAttachments(activeKey, (prev) =>
         prev.map((attachment) =>
           attachment.id === id ? { ...attachment, spoiler: !attachment.spoiler } : attachment
         )
       )
     },
-    [setAttachments, storeKey]
+    [activeKey, setAttachments]
   )
 
   return {
@@ -223,6 +268,8 @@ export const useComposerAttachments = ({
     removeAttachment,
     retryAttachment,
     clearAttachments,
+    releaseSentAttachments,
+    discardModeAttachments,
     loadExistingAttachments,
     flushRemovedPersistedStorage,
     cancelEditAttachments,
@@ -231,7 +278,6 @@ export const useComposerAttachments = ({
     isUploading,
     readyAttachmentCount,
     getReadyAttachments,
-    toggleAttachmentSpoiler,
-    storeKey
+    toggleAttachmentSpoiler
   }
 }

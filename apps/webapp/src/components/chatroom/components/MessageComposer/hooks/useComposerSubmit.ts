@@ -1,4 +1,8 @@
 import { sendCommentMessage, updateMessage } from '@api'
+import {
+  composerAttachmentKey,
+  useComposerAttachmentsStore
+} from '@components/chatroom/stores/composerAttachmentsStore'
 import type { SendDraft, SendResult } from '@components/chatroom/types/send.types'
 import { composerSendGate } from '@components/chatroom/utils/composerSendGate'
 import { openComposerSignIn } from '@components/chatroom/utils/openComposerSignIn'
@@ -6,17 +10,19 @@ import {
   dispatchOutboundChunk,
   ensureOutboundStorageReady,
   isAlreadyCapturedError,
+  isFailedRowError,
   prepareOutboundContent
 } from '@components/chatroom/utils/outboundMessagePipeline'
 import { showNotificationPrompt } from '@components/NotificationPromptCard'
 import * as toast from '@components/toast'
 import { discardComposerDraft } from '@db/messageComposerDB'
 import { useApi } from '@hooks/useApi'
+import { useChatStore } from '@stores'
 import type { Editor } from '@tiptap/react'
 import type { CommentMessageMemory, ComposerMessageMemory, MessageMediaItem } from '@types'
 import { captureUnknown } from '@utils/observability'
 import { sanitizeChunk } from '@utils/sanitizeContent'
-import { useCallback } from 'react'
+import { useCallback, useRef } from 'react'
 
 import { useComposerEmojiPanelStore } from '../stores/composerEmojiPanelStore'
 import { isComposerLinkDialogOpen } from '../stores/composerLinkDialogStore'
@@ -28,7 +34,8 @@ export type ComposerSubmitArgs = {
   editor: Editor | null
   contextSend: (draft: SendDraft) => Promise<SendResult>
   getReadyAttachments: () => MessageMediaItem[]
-  clearAttachments: (options?: { deleteStorage?: boolean }) => void
+  clearAttachments: () => void
+  releaseSentAttachments: (sent: MessageMediaItem[]) => () => void
   flushRemovedPersistedStorage: () => void
   isUploadingAttachments?: boolean
   hasUploadErrors?: boolean
@@ -37,9 +44,21 @@ export type ComposerSubmitArgs = {
   commentMessageMemory: CommentMessageMemory | null | undefined
   setReplyMsgMemory: (channelId: string, value: null) => void
   setEditMsgMemory: (channelId: string, value: null) => void
-  setCommentMsgMemory: (channelId: string, value: null) => void
+  setCommentMsgMemory: (channelId: string, value: CommentMessageMemory | null) => void
   cancelPendingEditorDraftCapture: () => void
   keepKeyboardAfterSubmit?: boolean
+}
+
+// The submit closure holds the modes of the render that began the send, so read the store.
+const isComposerUntouched = (editor: Editor, channelId: string): boolean => {
+  const memory = useChatStore.getState().workspaceSettings.channels.get(channelId)
+  return (
+    !editor.isDestroyed &&
+    editor.isEmpty &&
+    !memory?.replyMessageMemory &&
+    !memory?.editMessageMemory &&
+    !memory?.commentMessageMemory
+  )
 }
 
 export const useComposerSubmit = ({
@@ -50,6 +69,7 @@ export const useComposerSubmit = ({
   contextSend,
   getReadyAttachments,
   clearAttachments,
+  releaseSentAttachments,
   flushRemovedPersistedStorage,
   isUploadingAttachments = false,
   hasUploadErrors = false,
@@ -64,6 +84,7 @@ export const useComposerSubmit = ({
 }: ComposerSubmitArgs) => {
   const { request: updateMsg } = useApi(updateMessage, null, false)
   const { request: sendComment } = useApi(sendCommentMessage, null, false)
+  const probingRef = useRef(false)
 
   const isSubmittable = useCallback(() => {
     if (!user || !editor) return false
@@ -89,7 +110,10 @@ export const useComposerSubmit = ({
     if (commentMessageMemory) setCommentMsgMemory(channelId, null)
 
     cancelPendingEditorDraftCapture()
-    if (workspaceId && channelId) void discardComposerDraft(workspaceId, channelId)
+    // An edit save keeps the saved draft, and the end of the edit loads it back.
+    if (workspaceId && channelId && !editMessageMemory) {
+      void discardComposerDraft(workspaceId, channelId)
+    }
 
     const panelOpen = useComposerEmojiPanelStore.getState().isOpen
     const linkDialogOpen = isComposerLinkDialogOpen()
@@ -123,7 +147,7 @@ export const useComposerSubmit = ({
         openComposerSignIn(channelId)
         return
       }
-      if (!isSubmittable() || !editor) return
+      if (!isSubmittable() || !editor || probingRef.current) return
 
       const readyMedias = getReadyAttachments()
       const replyToId = editMessageMemory?.id ?? replyMessageMemory?.id ?? null
@@ -140,7 +164,11 @@ export const useComposerSubmit = ({
         return
       }
 
-      const storageReady = await ensureOutboundStorageReady(prepared)
+      // The composer clears only after the probe, so a second press here would send a second copy.
+      probingRef.current = true
+      const storageReady = await ensureOutboundStorageReady(prepared).finally(() => {
+        probingRef.current = false
+      })
       if (!storageReady) {
         toast.Error('Attachments are still uploading. Wait a moment and try again.')
         return
@@ -157,7 +185,19 @@ export const useComposerSubmit = ({
         })
       }
 
-      if (prepared.shouldClearComposerEarly) cleanupAfterSubmit()
+      const clearEarly = prepared.shouldClearComposerEarly
+      const unsentHtml = clearEarly ? editor.getHTML() : ''
+      // The early clear ends comment mode, which empties the record of the files the comment added.
+      // A restored comment records them again, so a later cancel still deletes their uploads.
+      const draftKey = composerAttachmentKey(workspaceId, channelId)
+      const { modeAddedByKey, pushModeAddedId } = useComposerAttachmentsStore.getState()
+      const unsentModeAddedIds = modeAddedByKey[draftKey] ?? []
+      // Release before the clear, so the sent files leave the draft list first. The clear ends a
+      // reply or comment, which deletes the uploads that the mode added. It also fires the text
+      // writer, which saves the draft list as the saved draft.
+      const restoreAttachments =
+        clearEarly && prepared.hasAttachments ? releaseSentAttachments(readyMedias) : null
+      if (clearEarly) cleanupAfterSubmit()
 
       try {
         if (prepared.htmlChunks.length === 0) {
@@ -175,21 +215,38 @@ export const useComposerSubmit = ({
         if (!isAlreadyCapturedError(error)) {
           captureUnknown(error, { tags: { surface: 'chat-send' } })
         }
+        // A failed send with media left a failed row, which keeps the media for Retry and Delete.
+        // Otherwise an untouched composer takes back the sent media, and a comment's text and mode.
+        if (isFailedRowError(error)) {
+          if (prepared.hasAttachments) releaseSentAttachments(readyMedias)
+        } else if (clearEarly && isComposerUntouched(editor, channelId)) {
+          restoreAttachments?.()
+          if (prepared.mode.kind === 'comment') {
+            setCommentMsgMemory(channelId, prepared.mode.commentMemory)
+            editor.commands.setContent(unsentHtml)
+            for (const id of unsentModeAddedIds) pushModeAddedId(draftKey, id)
+          }
+        }
         toast.Error(error instanceof Error ? error.message : 'Failed to send')
         return
       }
 
-      if (prepared.hasAttachments) clearAttachments({ deleteStorage: false })
-      if (!prepared.shouldClearComposerEarly) cleanupAfterSubmit()
+      if (prepared.hasAttachments) {
+        if (clearEarly) releaseSentAttachments(readyMedias)
+        else clearAttachments()
+      }
+      if (!clearEarly) cleanupAfterSubmit()
       showNotificationPrompt()
     },
     [
       user,
       channelId,
+      workspaceId,
       editor,
       isSubmittable,
       getReadyAttachments,
       clearAttachments,
+      releaseSentAttachments,
       flushRemovedPersistedStorage,
       cleanupAfterSubmit,
       editMessageMemory,
@@ -197,7 +254,8 @@ export const useComposerSubmit = ({
       replyMessageMemory,
       updateMsg,
       sendComment,
-      contextSend
+      contextSend,
+      setCommentMsgMemory
     ]
   )
 

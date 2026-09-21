@@ -2,7 +2,7 @@ import type { ComposerAttachment } from '@components/chatroom/stores/composerAtt
 import { parseMessageMedias } from '@components/chatroom/utils/messageMediaPaths'
 import type { Editor } from '@tiptap/react'
 import type { CommentMessageMemory, ComposerMessageMemory, MessageMediaItem } from '@types'
-import { useEffect, useRef } from 'react'
+import { useEffect } from 'react'
 
 import {
   hydrateComposerAttachmentsFromDraft,
@@ -17,11 +17,9 @@ type Args = {
   editorRef: React.RefObject<HTMLDivElement | null>
   attachments: ComposerAttachment[]
   addFiles: (files: FileList | File[]) => void
-  clearAttachments: (options?: { deleteStorage?: boolean }) => void
+  discardModeAttachments: () => void
   loadExistingAttachments: (items: MessageMediaItem[]) => void
   cancelEditAttachments: () => void
-  text: string
-  html: string
   draftHydrated: boolean
   replyMessageMemory: ComposerMessageMemory | null | undefined
   editMessageMemory: ComposerMessageMemory | null | undefined
@@ -37,11 +35,9 @@ export const useComposerAttachmentLifecycle = ({
   editorRef,
   attachments,
   addFiles,
-  clearAttachments,
+  discardModeAttachments,
   loadExistingAttachments,
   cancelEditAttachments,
-  text,
-  html,
   draftHydrated,
   replyMessageMemory,
   editMessageMemory,
@@ -55,9 +51,8 @@ export const useComposerAttachmentLifecycle = ({
   useComposerAttachmentDraft({
     workspaceId,
     channelId,
+    editor,
     attachments,
-    draftText: text,
-    draftHtml: html,
     draftHydrated,
     skipDraft: skipAttachmentDraft,
     onHydrateAttachments: (drafts) => {
@@ -76,14 +71,11 @@ export const useComposerAttachmentLifecycle = ({
     cancelEditAttachments()
   }, [editMessageMemory, cancelEditAttachments])
 
-  const hadReplyOrCommentRef = useRef(false)
+  // Also runs at mount: the desktop Close chatroom clears every mode and unmounts in one tick.
   useEffect(() => {
-    const inReplyOrComment = Boolean(replyMessageMemory || commentMessageMemory)
-    if (hadReplyOrCommentRef.current && !inReplyOrComment) {
-      clearAttachments({ deleteStorage: true })
-    }
-    hadReplyOrCommentRef.current = inReplyOrComment
-  }, [replyMessageMemory, commentMessageMemory, clearAttachments])
+    if (replyMessageMemory || commentMessageMemory) return
+    discardModeAttachments()
+  }, [replyMessageMemory, commentMessageMemory, discardModeAttachments])
 
   useEffect(() => {
     if (!editor) return

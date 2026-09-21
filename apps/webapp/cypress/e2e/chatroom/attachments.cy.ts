@@ -310,7 +310,7 @@ describe('chatroom attachments', () => {
       expectAttachmentVisible('dropped.png')
     })
 
-    it('keeps attachment strip after failed send', () => {
+    it('clears the strip and shows the failed row after a failed send', () => {
       cy.intercept('POST', '**/rest/v1/messages*', {
         statusCode: 401,
         body: { code: '42501' }
@@ -327,8 +327,8 @@ describe('chatroom attachments', () => {
       waitForAttachmentUpload()
       cy.get('[data-testid="composer-primary-action"]').click()
       cy.wait('@failedSend', { timeout: 15_000 })
-      cy.contains('keep-me.png').should('be.visible')
-      cy.contains('Failed to send').should('be.visible')
+      cy.get('[data-chat-composer-surface]').should('not.contain', 'keep-me.png')
+      cy.get('button[aria-label="Retry sending message"]').should('be.visible')
     })
 
     it('marks an image attachment as spoiler before send', () => {

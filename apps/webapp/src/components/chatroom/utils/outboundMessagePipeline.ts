@@ -289,10 +289,17 @@ export async function dispatchOutboundChunk(
   // persistChatMessage already reported 'failed' (and auth gates aren't errors);
   // flag the wrapper so the composer's catch toasts without a second capture.
   if (result === 'auth_required') throw markAlreadyCaptured(new Error('Not authenticated'))
-  if (result === 'failed') throw markAlreadyCaptured(new Error('Failed to send message'))
+  // A failed send with media left a failed row, because a row with media passes every feed filter.
+  if (result === 'failed') {
+    const error = Object.assign(new Error('Failed to send message'), { failedRow: true })
+    throw markAlreadyCaptured(error)
+  }
 }
 
 const markAlreadyCaptured = (error: Error) => Object.assign(error, { alreadyCaptured: true })
 
 export const isAlreadyCapturedError = (error: unknown): boolean =>
   error instanceof Error && 'alreadyCaptured' in error
+
+export const isFailedRowError = (error: unknown): boolean =>
+  error instanceof Error && 'failedRow' in error

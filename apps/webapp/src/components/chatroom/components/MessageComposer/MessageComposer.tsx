@@ -66,7 +66,6 @@ const MessageComposer = ({
 
   const {
     editor,
-    html,
     text,
     isEmojiOnly,
     setIsEmojiOnly,
@@ -95,6 +94,8 @@ const MessageComposer = ({
     removeAttachment,
     retryAttachment,
     clearAttachments,
+    releaseSentAttachments,
+    discardModeAttachments,
     loadExistingAttachments,
     flushRemovedPersistedStorage,
     cancelEditAttachments,
@@ -117,11 +118,9 @@ const MessageComposer = ({
     editorRef,
     attachments,
     addFiles,
-    clearAttachments,
+    discardModeAttachments,
     loadExistingAttachments,
     cancelEditAttachments,
-    text,
-    html,
     draftHydrated,
     replyMessageMemory,
     editMessageMemory,
@@ -134,7 +133,6 @@ const MessageComposer = ({
     workspaceId,
     channelId,
     editMessageMemory,
-    replyMessageMemory,
     commentMessageMemory,
     setIsEmojiOnly,
     setDraftHydrated
@@ -162,6 +160,7 @@ const MessageComposer = ({
     keepKeyboardAfterSubmit: isMobile,
     getReadyAttachments,
     clearAttachments,
+    releaseSentAttachments,
     flushRemovedPersistedStorage,
     isUploadingAttachments: isUploading,
     hasUploadErrors

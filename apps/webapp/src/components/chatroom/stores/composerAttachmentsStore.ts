@@ -6,7 +6,7 @@ export type ComposerAttachment = {
   id: string
   file?: File
   item?: MessageMediaItem
-  status: 'uploading' | 'ready' | 'error'
+  status: 'uploading' | 'ready' | 'error' | 'expired'
   progress?: number
   error?: string
   /** Row-backed media — do not delete storage on composer clear/cancel. */
@@ -16,21 +16,27 @@ export type ComposerAttachment = {
 
 const emptyAttachments: ComposerAttachment[] = []
 
-export const composerAttachmentKey = (workspaceId: string, channelId: string): string =>
-  `${workspaceId}::${channelId}`
+export const composerAttachmentKey = (
+  workspaceId: string | undefined,
+  channelId: string
+): string => (workspaceId ? `${workspaceId}::${channelId}` : channelId)
+
+export const composerEditAttachmentKey = (draftKey: string): string => `${draftKey}::edit`
 
 type ComposerAttachmentsState = {
   byKey: Record<string, ComposerAttachment[]>
   removedPersistedByKey: Record<string, string[]>
+  modeAddedByKey: Record<string, string[]>
   setAttachments: (
     key: string,
     next: ComposerAttachment[] | ((prev: ComposerAttachment[]) => ComposerAttachment[])
   ) => void
-  clearAttachmentsForKey: (key: string) => void
   takeRemovedPersistedPaths: (key: string) => string[]
   pushRemovedPersistedPath: (key: string, path: string) => void
   resetRemovedPersistedPaths: (key: string) => void
-  pruneExceptKey: (keepKey: string) => void
+  takeModeAddedIds: (key: string) => string[]
+  pushModeAddedId: (key: string, id: string) => void
+  pruneExceptKeys: (keepKeys: string[]) => void
 }
 
 export const selectComposerAttachmentsByKey =
@@ -38,25 +44,19 @@ export const selectComposerAttachmentsByKey =
   (state: ComposerAttachmentsState): ComposerAttachment[] =>
     state.byKey[key] ?? emptyAttachments
 
+const pickKeys = <T>(record: Record<string, T>, keys: string[]): Record<string, T> =>
+  Object.fromEntries(Object.entries(record).filter(([key]) => keys.includes(key)))
+
 export const useComposerAttachmentsStore = create<ComposerAttachmentsState>((set, get) => ({
   byKey: {},
   removedPersistedByKey: {},
+  modeAddedByKey: {},
 
   setAttachments: (key, next) => {
     set((state) => {
       const prev = state.byKey[key] ?? []
       const resolved = typeof next === 'function' ? next(prev) : next
       return { byKey: { ...state.byKey, [key]: resolved } }
-    })
-  },
-
-  clearAttachmentsForKey: (key) => {
-    set((state) => {
-      const nextByKey = { ...state.byKey }
-      delete nextByKey[key]
-      const nextRemoved = { ...state.removedPersistedByKey }
-      delete nextRemoved[key]
-      return { byKey: nextByKey, removedPersistedByKey: nextRemoved }
     })
   },
 
@@ -84,12 +84,29 @@ export const useComposerAttachmentsStore = create<ComposerAttachmentsState>((set
     }))
   },
 
-  pruneExceptKey: (keepKey) => {
+  takeModeAddedIds: (key) => {
+    const ids = get().modeAddedByKey[key] ?? []
+    if (ids.length === 0) return []
     set((state) => ({
-      byKey: state.byKey[keepKey] ? { [keepKey]: state.byKey[keepKey]! } : {},
-      removedPersistedByKey: state.removedPersistedByKey[keepKey]
-        ? { [keepKey]: state.removedPersistedByKey[keepKey]! }
-        : {}
+      modeAddedByKey: { ...state.modeAddedByKey, [key]: [] }
+    }))
+    return ids
+  },
+
+  pushModeAddedId: (key, id) => {
+    set((state) => ({
+      modeAddedByKey: {
+        ...state.modeAddedByKey,
+        [key]: [...(state.modeAddedByKey[key] ?? []), id]
+      }
+    }))
+  },
+
+  pruneExceptKeys: (keepKeys) => {
+    set((state) => ({
+      byKey: pickKeys(state.byKey, keepKeys),
+      removedPersistedByKey: pickKeys(state.removedPersistedByKey, keepKeys),
+      modeAddedByKey: pickKeys(state.modeAddedByKey, keepKeys)
     }))
   }
 }))
@@ -100,17 +117,4 @@ export const deleteNonPersistedAttachmentStorage = (attachments: ComposerAttachm
       void deleteChatMediaFromStorage(attachment.item)
     }
   }
-}
-
-export const disposeComposerAttachmentsForKey = (
-  key: string,
-  options?: { deleteStorage?: boolean }
-) => {
-  const deleteStorage = options?.deleteStorage ?? true
-  const state = useComposerAttachmentsStore.getState()
-  const attachments = state.byKey[key] ?? []
-
-  if (deleteStorage) deleteNonPersistedAttachmentStorage(attachments)
-
-  state.clearAttachmentsForKey(key)
 }

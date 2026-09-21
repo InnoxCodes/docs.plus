@@ -271,9 +271,7 @@ export const ChatroomProvider: React.FC<{
       },
       isFeedSpoilerRevealed: (path: string) =>
         isFeedSpoilerRevealed({ path, url: path, type: 'image' }),
-      resetComposerAttachments: () => {
-        useComposerAttachmentsStore.setState({ byKey: {}, removedPersistedByKey: {} })
-      }
+      resetComposerAttachments: () => useComposerAttachmentsStore.getState().pruneExceptKeys([])
     }
     return () => {
       delete (window as any).__chatTestApi

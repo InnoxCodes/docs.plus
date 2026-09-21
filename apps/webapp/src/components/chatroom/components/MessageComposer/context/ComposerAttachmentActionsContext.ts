@@ -4,7 +4,7 @@ export type ComposerAttachmentActions = {
   addFiles: (files: FileList | File[]) => void
   removeAttachment: (id: string) => void
   retryAttachment: (id: string) => void
-  clearAttachments: (options?: { deleteStorage?: boolean }) => void
+  clearAttachments: () => void
   toggleAttachmentSpoiler: (id: string) => void
 }
 

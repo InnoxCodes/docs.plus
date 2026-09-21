@@ -64,3 +64,10 @@ export async function ensureChatMediaInsertReady(
 ): Promise<boolean> {
   return awaitChatMediaStorageReady(collectMediaInsertPaths(medias), options)
 }
+
+/** One network call. A failed request answers false, so only a real "not found" marks an upload gone. */
+export async function probeChatMediaObjectMissing(path: string): Promise<boolean> {
+  const { error } = await supabaseClient.storage.from(CHAT_MEDIA_BUCKET).createSignedUrl(path, 60)
+  // Storage answers a missing object with HTTP 400 and a body statusCode of "404".
+  return error?.statusCode === '404'
+}

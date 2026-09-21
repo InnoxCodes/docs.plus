@@ -55,6 +55,10 @@ const AttachmentChip = ({
   const previewUrl = signedPreviewUrl ?? blobUrl
   const isUploading = attachment.status === 'uploading'
   const isError = attachment.status === 'error'
+  // A restored row whose upload is gone. It has no file, so it offers Remove but no Retry.
+  const isExpired = attachment.status === 'expired'
+  const showsError = isError || isExpired
+  const expiredLabel = isExpired ? 'Upload expired' : undefined
   const progress = attachment.progress ?? 0
 
   // Local image preview while uploading. Keyed on the stable File so per-tick progress
@@ -77,7 +81,7 @@ const AttachmentChip = ({
 
   let fullPlaceholderIcon: React.ReactNode = null
   if (!isUploading) {
-    if (isError) {
+    if (showsError) {
       fullPlaceholderIcon = <Icons.alert size={16} className="text-error shrink-0 stroke-[1.75]" />
     } else {
       fullPlaceholderIcon = <MediaIcon kind={kind} />
@@ -93,6 +97,8 @@ const AttachmentChip = ({
         {attachment.error ?? 'Upload failed'}
       </p>
     )
+  } else if (isExpired) {
+    statusLine = <p className="text-error text-[10px]">{expiredLabel}</p>
   } else if (attachment.status === 'ready') {
     statusLine = <p className="text-base-content/60 text-[10px]">Ready to send</p>
   }
@@ -102,7 +108,7 @@ const AttachmentChip = ({
       <div
         className={twMerge(
           'relative size-10 shrink-0',
-          isError && 'ring-error/50 rounded-field ring-1'
+          showsError && 'ring-error/50 rounded-field ring-1'
         )}>
         {previewUrl ? (
           <img
@@ -118,10 +124,15 @@ const AttachmentChip = ({
           <div
             className={twMerge(
               'bg-base-200 rounded-field flex size-full items-center justify-center',
-              isError && 'bg-error/10'
+              showsError && 'bg-error/10'
             )}>
-            {isError ? (
-              <Icons.alert size={14} className="text-error shrink-0 stroke-[1.75]" />
+            {showsError ? (
+              <Icons.alert
+                size={14}
+                className="text-error shrink-0 stroke-[1.75]"
+                title={expiredLabel}
+                aria-label={expiredLabel}
+              />
             ) : (
               <MediaIcon kind={kind} />
             )}
@@ -153,7 +164,7 @@ const AttachmentChip = ({
     <div
       className={twMerge(
         'bg-base-100 border-base-300 rounded-field flex max-w-[14rem] min-w-[10rem] flex-col gap-1.5 border px-2 py-1.5',
-        isError && 'border-error/50 bg-error/5'
+        showsError && 'border-error/50 bg-error/5'
       )}>
       <div className="flex items-center gap-2">
         <div className="relative size-8 shrink-0">
@@ -164,14 +175,14 @@ const AttachmentChip = ({
               className={twMerge(
                 'rounded-field size-full object-cover',
                 isUploading && 'opacity-45',
-                isError && 'opacity-60'
+                showsError && 'opacity-60'
               )}
             />
           ) : (
             <div
               className={twMerge(
                 'bg-base-200 rounded-field flex size-8 items-center justify-center',
-                isError && 'bg-error/10'
+                showsError && 'bg-error/10'
               )}>
               {fullPlaceholderIcon}
             </div>

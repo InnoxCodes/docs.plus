@@ -1,16 +1,15 @@
-import { ComposerState, getComposerState } from '@db/messageComposerDB'
+import { getComposerState } from '@db/messageComposerDB'
 import { useStore } from '@stores'
 import type { Editor } from '@tiptap/react'
 import type { CommentMessageMemory, ComposerMessageMemory } from '@types'
 import { isOnlyEmoji } from '@utils/emojis'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 
 export type ComposerDraftArgs = {
   editor: Editor | null
   workspaceId?: string
   channelId: string
   editMessageMemory: ComposerMessageMemory | null | undefined
-  replyMessageMemory: ComposerMessageMemory | null | undefined
   commentMessageMemory: CommentMessageMemory | null | undefined
   setIsEmojiOnly: (value: boolean) => void
   setDraftHydrated: (hydrated: boolean) => void
@@ -21,39 +20,39 @@ export const useComposerDraft = ({
   workspaceId,
   channelId,
   editMessageMemory,
-  replyMessageMemory,
   commentMessageMemory,
   setIsEmojiOnly,
   setDraftHydrated
 }: ComposerDraftArgs) => {
   const isMobile = useStore((state) => state.settings.editor.isMobile)
+  const isEditing = Boolean(editMessageMemory)
+  const isCommenting = Boolean(commentMessageMemory)
+  const prevModeRef = useRef({ isEditing: false, isCommenting: false })
 
   useEffect(() => {
+    const prev = prevModeRef.current
+    prevModeRef.current = { isEditing, isCommenting }
     if (!editor || !workspaceId || !channelId) {
       setDraftHydrated(false)
       return
     }
-    if (editMessageMemory || replyMessageMemory || commentMessageMemory) {
+    // A comment that did not start from an edit keeps the editor, which can hold a restored comment.
+    if (isEditing || (isCommenting && !prev.isEditing)) {
       setDraftHydrated(true)
       return
     }
 
+    // The end of an edit or a comment replaces its text, even when the draft has no text.
+    const endsMode = prev.isEditing || prev.isCommenting
     setDraftHydrated(false)
     let cancelled = false
     getComposerState(workspaceId, channelId)
-      .then((draft: ComposerState | null) => {
+      .then((draft) => {
         if (cancelled) return
-        const hasDraft = Boolean(
-          draft?.text?.trim() || draft?.html?.trim() || (draft?.attachments?.length ?? 0) > 0
-        )
-        if (!hasDraft) return
-        if (draft?.html) {
-          if (isMobile) editor.commands.setContent(draft.html)
-          else editor.chain().setContent(draft.html).focus('end').run()
-        } else if (draft?.text) {
-          if (isMobile) editor.commands.setContent(draft.text)
-          else editor.chain().setContent(draft.text).focus('end').run()
-        }
+        const content = draft?.html || draft?.text || ''
+        if (!content && !endsMode) return
+        if (isMobile) editor.commands.setContent(content)
+        else editor.chain().setContent(content).focus('end').run()
         if (draft?.text && isOnlyEmoji(draft.text)) setIsEmojiOnly(true)
       })
       .finally(() => {
@@ -67,18 +66,16 @@ export const useComposerDraft = ({
     editor,
     workspaceId,
     channelId,
-    editMessageMemory,
-    replyMessageMemory,
-    commentMessageMemory,
+    isEditing,
+    isCommenting,
+    isMobile,
     setIsEmojiOnly,
-    setDraftHydrated,
-    isMobile
+    setDraftHydrated
   ])
 
   useEffect(() => {
     if (!editor || !editMessageMemory || editMessageMemory.channel_id !== channelId) return
-    const content = editMessageMemory.html || editMessageMemory.content
-    if (!content) return
+    const content = editMessageMemory.html || editMessageMemory.content || ''
     if (isMobile) editor.commands.setContent(content)
     else editor.chain().setContent(content).focus('start').run()
   }, [editor, editMessageMemory, channelId, isMobile])
