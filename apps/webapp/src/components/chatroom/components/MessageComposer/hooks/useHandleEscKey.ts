@@ -1,3 +1,5 @@
+import { useChatMediaGalleryStore } from '@components/chatroom/stores/chatMediaGalleryStore'
+import { getDefaultController } from '@docs.plus/extension-hyperlink'
 import { useCallback, useEffect } from 'react'
 
 import { useChatroomContext } from '../../../ChatroomContext'
@@ -11,6 +13,21 @@ import {
   useComposerLinkDialogStore
 } from '../stores/composerLinkDialogStore'
 import { useMessageComposer } from './useMessageComposer'
+
+/** Each surface handles this Escape itself; the popover handles only a key pressed inside it. */
+const isEscapeOwnedElsewhere = (target: EventTarget | null): boolean => {
+  const linkPopover = getDefaultController().getState()
+  return (
+    isMentionSuggestionPopupVisible() ||
+    useChatMediaGalleryStore.getState().isOpen ||
+    (linkPopover.kind === 'mounted' &&
+      target instanceof Node &&
+      linkPopover.element.contains(target))
+  )
+}
+
+// Filled in the capture phase, before the picker, the popover, or the gallery can close itself.
+const escapesOwnedElsewhere = new WeakSet<KeyboardEvent>()
 
 export const useHandleEscKey = () => {
   const { channelId } = useChatroomContext()
@@ -41,7 +58,7 @@ export const useHandleEscKey = () => {
           return
         }
 
-        if (isMentionSuggestionPopupVisible()) return
+        if (escapesOwnedElsewhere.has(event)) return
 
         if (replyMessageMemory) setReplyMsgMemory(channelId, null)
         if (editMessageMemory) {
@@ -65,6 +82,18 @@ export const useHandleEscKey = () => {
       setCommentMsgMemory
     ]
   )
+
+  useEffect(() => {
+    const recordEscapeOwnedElsewhere = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && isEscapeOwnedElsewhere(event.target)) {
+        escapesOwnedElsewhere.add(event)
+      }
+    }
+    window.addEventListener('keydown', recordEscapeOwnedElsewhere, true)
+    return () => {
+      window.removeEventListener('keydown', recordEscapeOwnedElsewhere, true)
+    }
+  }, [])
 
   useEffect(() => {
     window.addEventListener('keydown', handleEsc)

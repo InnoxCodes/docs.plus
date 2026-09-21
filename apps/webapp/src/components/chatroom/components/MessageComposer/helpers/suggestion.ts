@@ -135,7 +135,7 @@ export default {
       },
 
       onKeyDown(props: { event: KeyboardEvent }) {
-        // Return false so @tiptap/suggestion runs onExit + dispatchExit (true skips that path).
+        // @tiptap/suggestion 3.31.3 exits on Escape whatever this returns; false means not handled.
         if (props.event.key === 'Escape') {
           return false
         }
