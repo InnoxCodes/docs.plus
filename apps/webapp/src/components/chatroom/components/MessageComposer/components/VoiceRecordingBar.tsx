@@ -88,7 +88,7 @@ export function VoiceRecordingBar({
         ))}
       </div>
       {!isLocked ? (
-        <span className="text-base-content/50 hidden text-[10px] leading-tight sm:block">
+        <span className="text-base-content/50 text-[10px] leading-tight">
           <span className="block">slide up to lock</span>
           <span className="block">slide left to cancel</span>
         </span>

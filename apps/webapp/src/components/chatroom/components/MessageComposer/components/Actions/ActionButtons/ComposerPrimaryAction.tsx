@@ -89,6 +89,8 @@ export function ComposerPrimaryAction({ voice, className }: Props) {
         btnSize,
         'shrink-0 border-0 p-0',
         voice.phase === 'recording' && 'text-error',
+        // A browser pan fires pointercancel and ends the hold before a slide can lock or cancel.
+        isMobile && 'touch-none',
         className
       )}
       data-testid="composer-primary-action"

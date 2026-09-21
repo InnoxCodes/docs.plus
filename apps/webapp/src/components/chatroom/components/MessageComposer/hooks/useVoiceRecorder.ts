@@ -54,6 +54,9 @@ export function useVoiceRecorder({
   const anchorRef = useRef({ x: 0, y: 0 })
   const isLockedRef = useRef(false)
   const isCancelArmedRef = useRef(false)
+  // A release or a cleanup during the microphone request changes this id.
+  // The pending start then stops its stream and does not record.
+  const startIdRef = useRef(0)
 
   const clearTimers = useCallback(() => {
     if (stopTimerRef.current != null) {
@@ -92,6 +95,7 @@ export function useVoiceRecorder({
   }, [])
 
   const resetToIdle = useCallback(() => {
+    startIdRef.current++
     clearTimers()
     recorderRef.current = null
     chunksRef.current = []
@@ -105,8 +109,15 @@ export function useVoiceRecorder({
 
   const cancelRecording = useCallback(() => {
     clearTimers()
+    const recorder = recorderRef.current
+    // The recorder fires its stop event in a later task, after the reset below.
+    // Remove its handlers first, so that event cannot open a preview.
+    if (recorder) {
+      recorder.ondataavailable = null
+      recorder.onstop = null
+    }
     try {
-      recorderRef.current?.stop()
+      recorder?.stop()
     } catch {
       /* already stopped */
     }
@@ -119,11 +130,14 @@ export function useVoiceRecorder({
     setElapsedMs(0)
   }, [clearTimers, releaseStream, revokePreview, resetGesture])
 
+  // Read the live recorder, not this render's phase.
+  // The cap timer and the hold listeners keep old copies of this callback.
   const stopRecording = useCallback(() => {
-    if (phase !== 'recording') return
+    const recorder = recorderRef.current
+    if (recorder?.state !== 'recording') return
     clearTimers()
-    recorderRef.current?.stop()
-  }, [clearTimers, phase])
+    recorder.stop()
+  }, [clearTimers])
 
   const startWaveformLoop = useCallback(() => {
     const analyser = analyserRef.current
@@ -167,9 +181,14 @@ export function useVoiceRecorder({
 
       anchorRef.current = { x: clientX, y: clientY }
       resetGesture()
+      const startId = ++startIdRef.current
 
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        if (startId !== startIdRef.current) {
+          stream.getTracks().forEach((track) => track.stop())
+          return
+        }
         streamRef.current = stream
         chunksRef.current = []
 
@@ -226,6 +245,8 @@ export function useVoiceRecorder({
         stopTimerRef.current = window.setTimeout(() => stopRecording(), MAX_RECORD_MS)
         startWaveformLoop()
       } catch {
+        // A replaced start must not tear down the recording that replaced it.
+        if (startId !== startIdRef.current) return
         clearTimers()
         releaseStream()
         resetGesture()
@@ -248,38 +269,36 @@ export function useVoiceRecorder({
     ]
   )
 
-  const moveHold = useCallback(
-    (clientX: number, clientY: number) => {
-      if (phase !== 'recording' || isLockedRef.current) return
+  const moveHold = useCallback((clientX: number, clientY: number) => {
+    if (recorderRef.current?.state !== 'recording' || isLockedRef.current) return
 
-      const cancelPx = Math.min(0, clientX - anchorRef.current.x)
-      const lockPx = Math.max(0, anchorRef.current.y - clientY)
+    const cancelPx = Math.min(0, clientX - anchorRef.current.x)
+    const lockPx = Math.max(0, anchorRef.current.y - clientY)
 
-      const cancelArmed = cancelPx < -CANCEL_THRESHOLD_PX
-      const locked = lockPx > LOCK_THRESHOLD_PX
+    const cancelArmed = cancelPx < -CANCEL_THRESHOLD_PX
+    const locked = lockPx > LOCK_THRESHOLD_PX
 
-      setIsCancelArmed(cancelArmed)
-      isCancelArmedRef.current = cancelArmed
+    setIsCancelArmed(cancelArmed)
+    isCancelArmedRef.current = cancelArmed
 
-      if (locked) {
-        setIsLocked(true)
-        isLockedRef.current = true
-        setIsCancelArmed(false)
-        isCancelArmedRef.current = false
-      }
-    },
-    [phase]
-  )
+    if (locked) {
+      setIsLocked(true)
+      isLockedRef.current = true
+      setIsCancelArmed(false)
+      isCancelArmedRef.current = false
+    }
+  }, [])
 
   const endHold = useCallback(() => {
-    if (phase !== 'recording') return
+    startIdRef.current++
+    if (recorderRef.current?.state !== 'recording') return
     if (isLockedRef.current) return
     if (isCancelArmedRef.current) {
       cancelRecording()
       return
     }
     stopRecording()
-  }, [cancelRecording, phase, stopRecording])
+  }, [cancelRecording, stopRecording])
 
   const confirmAttach = useCallback(() => {
     if (!previewFile) return
@@ -297,7 +316,6 @@ export function useVoiceRecorder({
 
   const stopAndCleanup = useCallback(() => {
     if (phase === 'recording') {
-      isCancelArmedRef.current = true
       cancelRecording()
       return
     }
