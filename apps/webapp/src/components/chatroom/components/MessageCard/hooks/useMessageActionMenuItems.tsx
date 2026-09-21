@@ -171,13 +171,12 @@ export const useMessageActionMenuItems = (
         separatorBefore: !isOwner
       },
       {
-        // Deliberately not hidden on your own messages: OSA s.20 wants the route
-        // open to anyone who meets the content.
+        // Hidden from the message menu. Document report in Settings stays the route.
         id: 'report',
         title: 'Report',
         icon: <Icons.alert size={iconSize} />,
         onClickFn: () => openReportMail('message', getMessageUrl(message)),
-        display: true,
+        display: false,
         separatorBefore: true
       }
     )

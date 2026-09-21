@@ -77,8 +77,7 @@ export default function TermsPage() {
         <p>
           Tell us if you find content that breaks these rules or the law. Press{' '}
           <strong>Report a problem</strong> in Settings while a document is open, after Report an
-          Issue. On a chat message, open the menu and choose <strong>Report</strong>. Each one
-          starts a message to us with the link already filled in.
+          Issue. That starts a message to us with the link already filled in.
         </p>
         <p>
           You can also email{' '}
