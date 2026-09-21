@@ -101,6 +101,4 @@ export const useHandleEscKey = () => {
       window.removeEventListener('keydown', handleEsc)
     }
   }, [handleEsc])
-
-  return handleEsc
 }

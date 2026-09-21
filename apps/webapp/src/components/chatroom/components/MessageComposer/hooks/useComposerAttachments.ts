@@ -18,30 +18,22 @@ import { useChatStore } from '@stores'
 import type { MessageMediaItem } from '@types'
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 
-import { useComposerAttachmentList } from './useComposerAttachmentList'
-
 export type { ComposerAttachment } from '@components/chatroom/stores/composerAttachmentsStore'
 
 type Args = {
   workspaceId?: string
   channelId: string
   userId: string | undefined
-  disabled?: boolean
 }
 
-export const useComposerAttachments = ({
-  workspaceId,
-  channelId,
-  userId,
-  disabled = false
-}: Args) => {
+export const useComposerAttachments = ({ workspaceId, channelId, userId }: Args) => {
   const draftKey = composerAttachmentKey(workspaceId, channelId)
   const editKey = composerEditAttachmentKey(draftKey)
   const editing = useChatStore((state) =>
     Boolean(state.workspaceSettings.channels.get(channelId)?.editMessageMemory)
   )
   const activeKey = editing ? editKey : draftKey
-  const attachments = useComposerAttachmentList(workspaceId, channelId)
+  const attachments = useComposerAttachmentsStore(selectComposerAttachmentsByKey(activeKey))
   const setAttachments = useComposerAttachmentsStore((state) => state.setAttachments)
   const pushRemovedPersistedPath = useComposerAttachmentsStore(
     (state) => state.pushRemovedPersistedPath
@@ -151,7 +143,7 @@ export const useComposerAttachments = ({
   const addFiles = useCallback(
     (files: FileList | File[]) => {
       const runner = activeRunnerRef.current
-      if (disabled || !userId || !runner) return
+      if (!userId || !runner) return
 
       const incoming = Array.from(files)
       const slotsLeft = CHAT_MEDIA_MAX_ATTACHMENTS - attachmentsRef.current.length
@@ -178,7 +170,7 @@ export const useComposerAttachments = ({
         runner.enqueue(id, file)
       }
     },
-    [activeRunnerRef, channelId, disabled, draftKey, pushModeAddedId, userId]
+    [activeRunnerRef, channelId, draftKey, pushModeAddedId, userId]
   )
 
   const loadExistingAttachments = useCallback(
@@ -208,19 +200,14 @@ export const useComposerAttachments = ({
   const retryAttachment = useCallback(
     (id: string) => {
       const runner = activeRunnerRef.current
-      if (disabled || !userId || !runner) return
+      if (!userId || !runner) return
 
       const attachment = attachmentsRef.current.find((entry) => entry.id === id)
       if (!attachment?.file || attachment.status !== 'error') return
 
       runner.enqueue(id, attachment.file)
     },
-    [activeRunnerRef, disabled, userId]
-  )
-
-  const hasReadyAttachments = useMemo(
-    () => attachments.some((attachment) => attachment.status === 'ready' && attachment.item),
-    [attachments]
+    [activeRunnerRef, userId]
   )
 
   const isUploading = useMemo(
@@ -273,7 +260,6 @@ export const useComposerAttachments = ({
     loadExistingAttachments,
     flushRemovedPersistedStorage,
     cancelEditAttachments,
-    hasReadyAttachments,
     hasUploadErrors,
     isUploading,
     readyAttachmentCount,

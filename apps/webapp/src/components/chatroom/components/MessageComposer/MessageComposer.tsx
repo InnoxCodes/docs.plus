@@ -238,10 +238,9 @@ const MessageComposer = ({
       addFiles,
       removeAttachment,
       retryAttachment,
-      clearAttachments,
       toggleAttachmentSpoiler
     }),
-    [addFiles, removeAttachment, retryAttachment, clearAttachments, toggleAttachmentSpoiler]
+    [addFiles, removeAttachment, retryAttachment, toggleAttachmentSpoiler]
   )
 
   const contextValue = useMemo(
