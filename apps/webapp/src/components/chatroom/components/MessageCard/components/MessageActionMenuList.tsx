@@ -1,7 +1,5 @@
-import {
-  type MessageActionMenuItem,
-  useMessageActionMenuItems
-} from '@components/chatroom/components/MessageCard/hooks/useMessageActionMenuItems'
+import { type MessageActionMenuItem } from '@components/chatroom/components/MessageCard/hooks/messageActionMenu'
+import { useMessageActionMenuItems } from '@components/chatroom/components/MessageCard/hooks/useMessageActionMenuItems'
 import { ContextMenuDivider, ContextMenuRow, MenuItem } from '@components/ui/ContextMenu'
 import { useCloseAfterHold } from '@hooks/useCloseAfterHold'
 import { Icons } from '@icons'

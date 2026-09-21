@@ -1,5 +1,6 @@
 import { useChatroomContext } from '@components/chatroom/ChatroomContext'
 import { DeleteMessageConfirmationDialog } from '@components/chatroom/components/MessageCard/components/common/DeleteMessageConfirmationDialog'
+import { messageActionTitle } from '@components/chatroom/components/MessageCard/hooks/messageActionMenu'
 import { useMessageCardContext } from '@components/chatroom/components/MessageCard/MessageCardContext'
 import { Icons } from '@icons'
 import { useAuthStore } from '@stores'
@@ -29,7 +30,7 @@ export const DeleteAction = () => {
           className="text-error flex cursor-pointer items-center gap-2"
           onClick={handleDeleteClick}>
           <Icons.trash size={18} />
-          Delete Message
+          {messageActionTitle.delete}
         </a>
       </li>
     </>

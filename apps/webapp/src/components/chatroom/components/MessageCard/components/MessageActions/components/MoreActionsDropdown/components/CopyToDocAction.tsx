@@ -1,3 +1,4 @@
+import { messageActionTitle } from '@components/chatroom/components/MessageCard/hooks/messageActionMenu'
 import { useCopyMessageToDocHandler } from '@components/chatroom/components/MessageCard/hooks/useCopyMessageToDocHandler'
 import { useMessageCardContext } from '@components/chatroom/components/MessageCard/MessageCardContext'
 import { Icons } from '@icons'
@@ -12,7 +13,7 @@ export const CopyToDocAction = () => {
     <li>
       <a className="flex items-center gap-2" onClick={() => copyMessageToDocHandler(message)}>
         <Icons.fileOpen size={18} />
-        Copy to doc
+        {messageActionTitle.copyToDoc}
       </a>
     </li>
   )

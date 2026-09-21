@@ -1,3 +1,4 @@
+import { messageActionTitle } from '@components/chatroom/components/MessageCard/hooks/messageActionMenu'
 import { useCopyMessageLinkHandler } from '@components/chatroom/components/MessageCard/hooks/useCopyMessageLinkHandler'
 import { useMessageCardContext } from '@components/chatroom/components/MessageCard/MessageCardContext'
 import { Icons } from '@icons'
@@ -17,7 +18,7 @@ export const CopyLinkAction = ({ className }: Props) => {
     <li className={twMerge('border-base-300', className)}>
       <a
         className={twMerge('flex items-center gap-2', copied && 'text-success')}
-        aria-label={copied ? 'Copied!' : 'Copy Link'}
+        aria-label={copied ? 'Copied!' : messageActionTitle.copyLink}
         onClick={() => copyMessageLinkHandler(message)}>
         <span className={twMerge('swap', copied && 'swap-active')} aria-hidden>
           <Icons.check size={18} className="swap-on text-success" />
@@ -25,7 +26,7 @@ export const CopyLinkAction = ({ className }: Props) => {
         </span>
         <span className={twMerge('swap', copied && 'swap-active')} aria-hidden>
           <span className="swap-on">Copied!</span>
-          <span className="swap-off">Copy Link</span>
+          <span className="swap-off">{messageActionTitle.copyLink}</span>
         </span>
       </a>
     </li>

@@ -1,3 +1,4 @@
+import { messageActionTitle } from '@components/chatroom/components/MessageCard/hooks/messageActionMenu'
 import { useEditMessageHandler } from '@components/chatroom/components/MessageCard/hooks/useEditMessageHandler'
 import { useMessageCardContext } from '@components/chatroom/components/MessageCard/MessageCardContext'
 import { Icons } from '@icons'
@@ -19,7 +20,7 @@ export const EditAction = () => {
     <li>
       <a className="flex items-center gap-2" onClick={() => editMessageHandler(message)}>
         <Icons.edit size={18} />
-        Edit Message
+        {messageActionTitle.edit}
       </a>
     </li>
   )

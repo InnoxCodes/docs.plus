@@ -19,8 +19,8 @@ export const HoverMenuActions = () => {
         <MessageCard.Actions.GroupAuth
           checkMessageAuthor={true}
           className="border-base-300 mt-1 border-t pt-1">
-          <MessageCard.Actions.Delete />
           <MessageCard.Actions.Edit />
+          <MessageCard.Actions.Delete />
         </MessageCard.Actions.GroupAuth>
         <MessageCard.Actions.ReadStatus />
       </HoverMenuDropdown>
