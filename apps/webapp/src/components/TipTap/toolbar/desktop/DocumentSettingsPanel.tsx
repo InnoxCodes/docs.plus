@@ -61,11 +61,14 @@ const DocumentSettingsPanel = ({
   const isOwner = Boolean(user?.id && user.id === docMetadata?.ownerId)
   const identity = isAuthServiceAvailable ? docMetadata?.ownerProfile : undefined
   const canFollow = Boolean(isAuthServiceAvailable && user?.id)
+  // Hide when nobody else can edit. The owner of a private or read-only pad is
+  // that case. A visitor still follows, because the owner can edit.
+  const showFollow = canFollow && (!isOwner || (!isPrivate && !readOnly))
   const { following, canToggle, toggle } = useDocumentFollow({
     documentId: docMetadata.documentId,
     // Membership, not sign-in. join_workspace writes the row the RPC matches,
     // so a read before it lands answers null and paints a false "off".
-    enabled: canFollow && Boolean(joinedWorkspace)
+    enabled: showFollow && Boolean(joinedWorkspace)
   })
 
   const saveDescriptionHandler = () => {
@@ -140,7 +143,7 @@ const DocumentSettingsPanel = ({
             <span className="badge badge-sm badge-soft">{readOnly ? 'Read-only' : 'Editable'}</span>
           </div>
         )}
-        {canFollow ? (
+        {showFollow ? (
           <ToggleSection
             name="Follow"
             description="Notify me when this document changes."
