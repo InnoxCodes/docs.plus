@@ -35,6 +35,12 @@ plus the house order in [`RELEASE_POLICY.md`](../../RELEASE_POLICY.md).
 
 ### Changed
 
+- `useVoiceRecorder` takes `onSend` and returns `sendPreview` and `discard`,
+  not `onAttach`, `confirmAttach`, and three reset paths. `useSendVoiceWhenReady`
+  sends a released note once its tile is ready. `addFiles` returns the ids it
+  queued and creates each row before its upload starts. `MessageMediaItem`
+  gains `duration` and `waveform`, which `readAudioShape` sets for voice notes.
+
 - The sign-in form checks the email on rest-api, not on Next.
 
 - The composer + menu is a dialog named Insert, with plain buttons and no
@@ -47,6 +53,9 @@ plus the house order in [`RELEASE_POLICY.md`](../../RELEASE_POLICY.md).
   the card root. The status paints in the timestamp slot.
 
 ### Fixed
+
+- `_chat-editor.scss` drops its unlayered `touch-action: manipulation` rule on
+  `.composer-bar__actions .btn`. It overrode the mic's layered `touch-none`.
 
 - The typing keyframe never ran. `.animate-badge-entry` came after
   `.avatar-typing` with the same specificity, so it won `animation`. A combined

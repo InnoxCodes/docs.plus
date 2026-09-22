@@ -12,6 +12,10 @@ This file is the product changelog. The webapp package keeps [`apps/webapp/CHANG
 
 ### Added
 
+- Play chat audio in a themed player, with seek and 1×, 1.5×, or 2× speed. A
+  voice note sent from now on shows its waveform and length before you press
+  play. Starting one clip pauses the others.
+
 - Show what a chat member is doing besides typing. A small smile on their
   avatar means they are choosing an emoji, and a mic means they are recording
   a voice note. The chip shows in the chat header and on the heading's row in
@@ -52,6 +56,13 @@ This file is the product changelog. The webapp package keeps [`apps/webapp/CHANG
 
 ### Changed
 
+- Send a voice note when you let go of the mic on a phone. It sends by itself
+  only when the composer holds nothing else; otherwise it waits for your Send.
+  A hold under one second sends nothing and shows how to record. While you
+  hold, a lock rises above the mic and Slide to cancel follows your finger.
+  Android phones buzz when the note starts, locks, or is ready to cancel. After
+  a lock, Stop opens a preview with Send and Discard.
+
 - Check a sign-in email on rest-api. Next keeps only the webapp health probe.
 
 - Move Report a problem out of the pad title. It now sits in Settings, after
@@ -89,9 +100,16 @@ This file is the product changelog. The webapp package keeps [`apps/webapp/CHANG
   longer fails or holds no text. An edit that is too long is refused before it
   saves, and your text stays in the composer.
 
-- Make hold-to-record on a phone answer to release, slide to lock, slide to
-  cancel, and the 5-minute limit. Cancel discards the note. Letting go while
-  the browser asks for the microphone turns the microphone off.
+- Make slide up to lock, slide left to cancel, and the 5-minute limit work
+  while you hold the mic on a phone. A composer style let the browser read a
+  slide as a scroll, and that ended the hold. Cancel discards the note. Letting
+  go while the browser asks for the microphone turns the microphone off.
+
+- Save a voice note recorded on an iPhone as `.m4a`. It was named `.webm`,
+  though it holds MP4 audio.
+
+- Show a file at once when you add it while three others upload, and count it
+  toward the 10-file limit. It used to stay hidden until its upload started.
 
 - Notify the right people when a chat message holds an @. A capital letter
   after a username no longer mentions a shorter name. An email address in a
