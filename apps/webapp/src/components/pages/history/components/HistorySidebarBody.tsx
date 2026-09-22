@@ -11,9 +11,28 @@ import { HistorySidebarRowItem } from './HistorySidebarRowItem'
 type HistorySidebarBodyProps = HistorySidebarRowHandlers & {
   rows: SidebarRow[]
   virtualize: boolean
+  hasMore?: boolean
+  onShowOlder?: () => void
 }
 
-export function HistorySidebarBody({ rows, virtualize, ...rowHandlers }: HistorySidebarBodyProps) {
+function OlderVersionsButton({ onShowOlder }: { onShowOlder?: () => void }) {
+  if (!onShowOlder) return null
+  return (
+    <div className="px-3 py-2">
+      <button type="button" className="btn btn-ghost btn-sm w-full" onClick={onShowOlder}>
+        Show older versions
+      </button>
+    </div>
+  )
+}
+
+export function HistorySidebarBody({
+  rows,
+  virtualize,
+  hasMore,
+  onShowOlder,
+  ...rowHandlers
+}: HistorySidebarBodyProps) {
   const { version } = useHistoryHash()
   const documentId = useStore((state) => state.settings.metadata?.documentId)
   const virtuosoRef = useRef<VirtuosoHandle>(null)
@@ -59,6 +78,11 @@ export function HistorySidebarBody({ rows, virtualize, ...rowHandlers }: History
               <HistorySidebarRowItem row={row} {...rowHandlers} />
             </div>
           )}
+          components={
+            hasMore
+              ? { Footer: () => <OlderVersionsButton onShowOlder={onShowOlder} /> }
+              : undefined
+          }
         />
       </div>
     )
@@ -76,6 +100,7 @@ export function HistorySidebarBody({ rows, virtualize, ...rowHandlers }: History
           <HistorySidebarRowItem row={row} {...rowHandlers} />
         </div>
       ))}
+      {hasMore ? <OlderVersionsButton onShowOlder={onShowOlder} /> : null}
     </ScrollArea>
   )
 }

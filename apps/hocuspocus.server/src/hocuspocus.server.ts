@@ -88,6 +88,7 @@ let versionOps: VersionOps | null = null
 
 const REVERT_TYPE = 'history.revert'
 const LIST_TYPE = 'history.list'
+const WATCH_TYPE = 'history.watch'
 
 // A revert runs six whole-document traversals on this event loop and appends a
 // permanent backup row. Unlike its REST twin, a revert is reachable by any
@@ -106,6 +107,23 @@ const listCoolingDown = (connection: Connection, now: number): boolean => {
   const previous = lastListAt.get(connection)
   if (previous !== undefined && now - previous < LIST_COOLDOWN_MS) return true
   lastListAt.set(connection, now)
+  return false
+}
+
+// A refused watch used to make the client evict the row and ask for the next
+// one, which walks the list. The cap still refuses, and the client stops.
+const WATCH_WINDOW_MS = 10_000
+const WATCH_MAX = 8
+const watchTimes = new WeakMap<Connection, number[]>()
+
+const watchOverBudget = (connection: Connection, now: number): boolean => {
+  const recent = (watchTimes.get(connection) ?? []).filter((at) => now - at < WATCH_WINDOW_MS)
+  if (recent.length >= WATCH_MAX) {
+    watchTimes.set(connection, recent)
+    return true
+  }
+  recent.push(now)
+  watchTimes.set(connection, recent)
   return false
 }
 
@@ -231,6 +249,8 @@ const statelessExtension = {
       type?: string
       documentId?: string
       version?: number
+      beforeVersion?: number
+      since?: string
     }
     try {
       parsedPayload = JSON.parse(payload) as typeof parsedPayload
@@ -267,11 +287,15 @@ const statelessExtension = {
         return
       }
 
-      // Only the list is gated, because `history.watch` reads one indexed row.
-      // The client answers a refused watch by evicting that version and asking
-      // for the next one. A cooldown there would therefore walk the client
-      // through its own list.
       if (type === LIST_TYPE && listCoolingDown(connection, Date.now())) {
+        sendHistoryResponse(connection, type, null, {
+          error: HISTORY_FAILED,
+          reason: 'rate-limited'
+        })
+        return
+      }
+
+      if (type === WATCH_TYPE && watchOverBudget(connection, Date.now())) {
         sendHistoryResponse(connection, type, null, {
           error: HISTORY_FAILED,
           reason: 'rate-limited'
@@ -282,7 +306,9 @@ const statelessExtension = {
       const historyPayload: HistoryPayload = {
         type,
         documentId: canonicalId,
-        version: parsedPayload.version
+        version: parsedPayload.version,
+        beforeVersion: parsedPayload.beforeVersion,
+        since: parsedPayload.since
       }
 
       try {

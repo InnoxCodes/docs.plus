@@ -20,7 +20,8 @@ describe('parseHistoryHash', () => {
     expect(parseHistoryHash('#history')).toEqual({
       isHistory: true,
       version: null,
-      versionQueryInvalid: false
+      versionQueryInvalid: false,
+      since: null
     })
   })
 
@@ -28,11 +29,23 @@ describe('parseHistoryHash', () => {
     expect(parseHistoryHash('#history?version=7').version).toBe(7)
   })
 
+  it('reads the digest window start', () => {
+    expect(parseHistoryHash('#history?since=2026-09-22T04:00:00.000Z').since).toBe(
+      '2026-09-22T04:00:00.000Z'
+    )
+    expect(parseHistoryHash('#history?since=not-a-date').since).toBeNull()
+  })
+
   // An unreadable version must not silently mean "the head": the sidebar shows a
   // different document state than the link promised, with nothing said.
   it.each(['#history?version=', '#history?version=abc'])('flags %s as invalid', (hash) => {
     const parsed = parseHistoryHash(hash)
-    expect(parsed).toEqual({ isHistory: true, version: null, versionQueryInvalid: true })
+    expect(parsed).toEqual({
+      isHistory: true,
+      version: null,
+      versionQueryInvalid: true,
+      since: null
+    })
   })
 
   it.each(['', '#', '#settings?tab=notifications', '#notifications'])(

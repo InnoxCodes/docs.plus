@@ -23,13 +23,20 @@ export type HistorySnapshot = {
   createdAt: Date
 }
 
-/** Sidebar list + latest body in one response (one network round-trip). */
+/** One sidebar page. The document bytes stay on `history.watch`. */
+export const HISTORY_LIST_PAGE = 50
+
+/** Sidebar list. `latestSnapshot` stays null so the head loads through watch. */
 export type HistoryListResult = {
   versions: HistoryVersionMeta[]
+  hasMore: boolean
+  beforeVersion?: number
+  /** Pass this as the next `beforeVersion`. Ignores an extra Last-left row. */
+  nextBefore?: number
   latestSnapshot: HistorySnapshot | null
   /**
-   * Uid -> profile side table rather than a profile per row. This list is
-   * unpaginated and a handful of authors repeat across every version of a doc.
+   * Uid -> profile side table rather than a profile per row. A handful of
+   * authors repeat across the page.
    */
   profiles: Record<string, ProfileLite>
   /** Per-document, not per-version (`@@id([documentId, clientId])`), so it ships once beside `profiles`. */
@@ -90,30 +97,47 @@ export async function handleHistoryStateless(payload: HistoryPayload): Promise<u
 
   switch (type) {
     case 'history.list': {
-      // Version order, not createdAt: an out-of-order commit would otherwise leave the
-      // list head and latestSnapshot on different rows. Neither query needs the other's row.
-      const [[rows, full], clientAuthors] = await Promise.all([
-        prisma.$transaction([
-          prisma.documents.findMany({
-            where: { documentId },
-            orderBy: { version: 'desc' },
-            select: {
-              version: true,
-              commitMessage: true,
-              trigger: true,
-              triggeredBy: true,
-              contributors: true,
-              createdAt: true
-            }
-          }),
-          prisma.documents.findFirst({
-            where: { documentId },
-            orderBy: { version: 'desc' },
-            select: { data: true, version: true, commitMessage: true, createdAt: true }
-          })
-        ]),
+      const beforeVersion =
+        typeof payload.beforeVersion === 'number' && Number.isInteger(payload.beforeVersion)
+          ? payload.beforeVersion
+          : undefined
+      const sinceMs = typeof payload.since === 'string' ? Date.parse(payload.since) : Number.NaN
+      const versionSelect = {
+        version: true,
+        commitMessage: true,
+        trigger: true,
+        triggeredBy: true,
+        contributors: true,
+        createdAt: true
+      } as const
+
+      const [pageRows, clientAuthors] = await Promise.all([
+        prisma.documents.findMany({
+          where: {
+            documentId,
+            ...(beforeVersion !== undefined ? { version: { lt: beforeVersion } } : {})
+          },
+          orderBy: { version: 'desc' },
+          take: HISTORY_LIST_PAGE + 1,
+          select: versionSelect
+        }),
         resolveClientAuthorBindings(documentId)
       ])
+
+      const hasMore = pageRows.length > HISTORY_LIST_PAGE
+      const rows = pageRows.slice(0, HISTORY_LIST_PAGE)
+      const nextBefore = rows[rows.length - 1]?.version
+
+      // Last left can sit older than this page. One extra metadata row keeps
+      // compare honest without shipping every version.
+      if (beforeVersion === undefined && Number.isFinite(sinceMs)) {
+        const anchor = await prisma.documents.findFirst({
+          where: { documentId, createdAt: { lte: new Date(sinceMs) } },
+          orderBy: [{ createdAt: 'desc' }, { version: 'desc' }],
+          select: versionSelect
+        })
+        if (anchor && !rows.some((row) => row.version === anchor.version)) rows.push(anchor)
+      }
 
       const versions: HistoryVersionMeta[] = rows.map((row) => ({
         ...row,
@@ -128,7 +152,10 @@ export async function handleHistoryStateless(payload: HistoryPayload): Promise<u
 
       return {
         versions,
-        latestSnapshot: full ? toSnapshot(full) : null,
+        hasMore,
+        ...(hasMore && nextBefore !== undefined ? { nextBefore } : {}),
+        ...(beforeVersion !== undefined ? { beforeVersion } : {}),
+        latestSnapshot: null,
         profiles: await resolveProfiles([...profileIds]),
         clientAuthors
       } satisfies HistoryListResult

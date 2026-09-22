@@ -169,6 +169,13 @@ function handleHistoryFailed(payload: HistoryStatelessPayload, deps: HistoryStat
   }
 
   if (failedType === 'history.watch') {
+    if (payload.reason === 'rate-limited') {
+      store().setPendingWatchVersion(null)
+      store().setPendingCompareVersion(null)
+      store().setLoadingHistory(false)
+      toast.Info('Too many versions opened at once. Wait a moment and try again.')
+      return
+    }
     // A failure frame echoes no version. With only the compare slot open it is
     // compare's, and the recovery path would evict the row the reader is viewing.
     if (store().pendingCompareVersion != null && failedVersion == null) {
@@ -246,11 +253,25 @@ function handleHistoryList(payload: HistoryStatelessPayload, deps: HistoryStatel
     latestSnapshot = undefined
     profiles = {}
     clientAuthors = []
+    store().setHistoryHasMore(false)
+    store().setHistoryNextBefore(null)
   } else {
-    list = raw.versions ?? []
+    const page = raw.versions ?? []
+    const older = raw.beforeVersion != null
+    const current = store().historyList
+    list = older
+      ? [...current, ...page.filter((item) => !current.some((row) => row.version === item.version))]
+      : page
     latestSnapshot = raw.latestSnapshot ?? null
-    profiles = raw.profiles ?? {}
+    profiles = older ? { ...store().profiles, ...(raw.profiles ?? {}) } : (raw.profiles ?? {})
     clientAuthors = raw.clientAuthors ?? []
+    store().setHistoryHasMore(Boolean(raw.hasMore))
+    store().setHistoryNextBefore(raw.nextBefore ?? null)
+    if (older) {
+      store().setHistoryList(list)
+      store().setProfiles(profiles)
+      return
+    }
   }
 
   const head = list[0]

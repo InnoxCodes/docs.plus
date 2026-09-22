@@ -27,6 +27,9 @@ interface IHistoryStore {
   pendingCompareSince: string | null
   /** A background `document:saved` re-list is in flight; its failure must not blank the sidebar. */
   silentListRefresh: boolean
+  /** The loaded page is not the whole list. */
+  historyHasMore: boolean
+  historyNextBefore: number | null
   setHistoryList: (historyList: HistoryItem[]) => void
   setActiveHistory: (activeHistory: HistoryItem | null) => void
   setLatestSnapshot: (item: HistoryItem | null) => void
@@ -40,6 +43,8 @@ interface IHistoryStore {
   setPendingCompareVersion: (version: number | null) => void
   setPendingCompareSince: (since: string | null) => void
   setSilentListRefresh: (silent: boolean) => void
+  setHistoryHasMore: (historyHasMore: boolean) => void
+  setHistoryNextBefore: (historyNextBefore: number | null) => void
 }
 
 const history = immer<IHistoryStore>((set) => ({
@@ -56,6 +61,8 @@ const history = immer<IHistoryStore>((set) => ({
   pendingCompareVersion: null,
   pendingCompareSince: null,
   silentListRefresh: false,
+  historyHasMore: false,
+  historyNextBefore: null,
   setHistoryList: (historyList: HistoryItem[]) => {
     set((state) => {
       state.historyList = historyList
@@ -132,6 +139,18 @@ const history = immer<IHistoryStore>((set) => ({
   setSilentListRefresh: (silentListRefresh: boolean) => {
     set((state) => {
       state.silentListRefresh = silentListRefresh
+    })
+  },
+
+  setHistoryHasMore: (historyHasMore: boolean) => {
+    set((state) => {
+      state.historyHasMore = historyHasMore
+    })
+  },
+
+  setHistoryNextBefore: (historyNextBefore: number | null) => {
+    set((state) => {
+      state.historyNextBefore = historyNextBefore
     })
   }
 }))

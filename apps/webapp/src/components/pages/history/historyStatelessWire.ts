@@ -21,6 +21,9 @@ export type HistoryListWireResponse =
   | {
       versions: HistoryItem[]
       latestSnapshot: HistoryItem | null
+      hasMore?: boolean
+      beforeVersion?: number
+      nextBefore?: number
       profiles?: HistoryProfileMap
       clientAuthors?: ClientAuthorBinding[]
     }
@@ -48,13 +51,16 @@ export type HistoryStatelessSender = {
 
 export function sendHistoryListRequest(
   sender: HistoryStatelessSender,
-  documentId: string | undefined
+  documentId: string | undefined,
+  options?: { beforeVersion?: number; since?: string | null }
 ): void {
   sender.sendStateless(
     JSON.stringify({
       msg: HISTORY_CLIENT_MSG,
       type: 'history.list',
-      documentId
+      documentId,
+      ...(options?.beforeVersion != null ? { beforeVersion: options.beforeVersion } : {}),
+      ...(options?.since ? { since: options.since } : {})
     })
   )
 }

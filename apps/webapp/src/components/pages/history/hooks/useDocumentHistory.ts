@@ -14,8 +14,17 @@ export const useDocumentHistory = () => {
     // list return early without hydrating — spinner up, nothing behind it.
     setSilentListRefresh(false)
     setLoadingHistory(true)
-    sendHistoryListRequest(hocuspocusProvider, documentId)
+    sendHistoryListRequest(hocuspocusProvider, documentId, {
+      since: useStore.getState().pendingCompareSince
+    })
   }, [hocuspocusProvider, documentId, setLoadingHistory, setSilentListRefresh])
 
-  return { fetchHistory }
+  const fetchOlderHistory = useCallback(() => {
+    if (!hocuspocusProvider) return
+    const beforeVersion = useStore.getState().historyNextBefore
+    if (beforeVersion == null) return
+    sendHistoryListRequest(hocuspocusProvider, documentId, { beforeVersion })
+  }, [hocuspocusProvider, documentId])
+
+  return { fetchHistory, fetchOlderHistory }
 }

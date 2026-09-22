@@ -8,6 +8,7 @@ import { twMerge } from 'tailwind-merge'
 
 import { HistoryAuthorsBody } from './components/HistoryAuthorsBody'
 import { HistorySidebarBody } from './components/HistorySidebarBody'
+import { useDocumentHistory } from './hooks/useDocumentHistory'
 import { useHistoryCompare } from './hooks/useHistoryCompare'
 import { useHistorySidebarRows } from './hooks/useHistorySidebarRows'
 import { useVersionContent } from './hooks/useVersionContent'
@@ -76,6 +77,8 @@ const HistorySidebar = ({
   const { watchVersionContent } = useVersionContent()
   const { compareMode, selectCompareBase } = useHistoryCompare()
   const [tab, setTab] = useState<HistoryTab>('Versions')
+  const historyHasMore = useStore((state) => state.historyHasMore)
+  const { fetchOlderHistory } = useDocumentHistory()
   const { historyList, activeVersion, rows, openDays, toggleDay, toggleSession } =
     useHistorySidebarRows()
 
@@ -116,6 +119,8 @@ const HistorySidebar = ({
       ) : (
         <HistorySidebarBody
           rows={rows}
+          hasMore={historyHasMore}
+          onShowOlder={fetchOlderHistory}
           virtualize={
             variant === 'desktop' && historyList.length >= HISTORY_SIDEBAR_VIRTUALIZE_THRESHOLD
           }

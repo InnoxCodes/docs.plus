@@ -9,6 +9,7 @@ import { formatVersionDate } from './helpers'
 
 const HISTORY_ROUTE = 'history'
 const VERSION_QUERY = 'version'
+const SINCE_QUERY = 'since'
 
 export type ParsedHistoryHash = {
   isHistory: boolean
@@ -16,26 +17,36 @@ export type ParsedHistoryHash = {
   version: number | null
   /** `version` query present but not a finite number. */
   versionQueryInvalid: boolean
+  /** Window start from a digest link. Null when absent or unreadable. */
+  since: string | null
+}
+
+function sinceFrom(params: URLSearchParams): string | null {
+  const raw = params.get(SINCE_QUERY)
+  if (!raw) return null
+  const at = Date.parse(raw)
+  return Number.isFinite(at) ? new Date(at).toISOString() : null
 }
 
 export function parseHistoryHash(hash: string): ParsedHistoryHash {
   const { route, search } = splitHashRoute(hash)
   if (route !== HISTORY_ROUTE) {
-    return { isHistory: false, version: null, versionQueryInvalid: false }
+    return { isHistory: false, version: null, versionQueryInvalid: false, since: null }
   }
   const params = new URLSearchParams(search)
+  const since = sinceFrom(params)
   if (!params.has(VERSION_QUERY)) {
-    return { isHistory: true, version: null, versionQueryInvalid: false }
+    return { isHistory: true, version: null, versionQueryInvalid: false, since }
   }
   const v = params.get(VERSION_QUERY)
   if (v === null || v === '') {
-    return { isHistory: true, version: null, versionQueryInvalid: true }
+    return { isHistory: true, version: null, versionQueryInvalid: true, since }
   }
   const n = Number(v)
   if (!Number.isFinite(n)) {
-    return { isHistory: true, version: null, versionQueryInvalid: true }
+    return { isHistory: true, version: null, versionQueryInvalid: true, since }
   }
-  return { isHistory: true, version: n, versionQueryInvalid: false }
+  return { isHistory: true, version: n, versionQueryInvalid: false, since }
 }
 
 /**
