@@ -77,10 +77,6 @@
     width: 100%;
   }
 
-  .composer-bar__actions .btn {
-    touch-action: manipulation;
-  }
-
   .composer-bar--mobile .composer-bar__input-row .composer-bar__actions .btn,
   .composer-bar--mobile .composer-bar__input-row .composer-bar__insert-trigger.btn {
     min-height: 2.75rem;
