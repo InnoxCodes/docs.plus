@@ -102,9 +102,8 @@ export const UserProfileDialog = ({ userId }: UserProfileDialogProps) => {
 
   const fullName = isNonEmptyString(userData.full_name) ? userData.full_name.trim() : 'Unknown user'
   const username = isNonEmptyString(userData.username) ? userData.username.trim() : undefined
-  const bio = isNonEmptyString(userData.profile_data?.bio)
-    ? userData.profile_data.bio.trim()
-    : undefined
+  const rawBio = userData.profile_data?.bio
+  const bio = isNonEmptyString(rawBio) ? rawBio.trim() : undefined
   const isOwnProfile = viewerId != null && viewerId === (userData.id || userId)
 
   const emptyProfile = isOwnProfile ? (
