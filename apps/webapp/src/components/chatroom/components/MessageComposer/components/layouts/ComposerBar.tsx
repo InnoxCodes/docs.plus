@@ -93,8 +93,7 @@ export function ComposerBar({ variant, className }: Props) {
         discardPreview={voice.discardPreview}
       />
 
-      <ComposerFormatPanel variant={variant} />
-      <FormattingToolbar variant={variant} />
+      {isDesktop ? <FormattingToolbar /> : <ComposerFormatPanel />}
 
       <div
         className={twMerge(

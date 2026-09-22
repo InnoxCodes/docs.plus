@@ -1,4 +1,3 @@
-import type { ChatroomVariant } from '@components/chatroom/types/chatroom.types'
 import ToolbarDivider from '@components/TipTap/toolbar/ToolbarDivider'
 import useReRenderOnEditorTransaction from '@hooks/useReRenderOnEditorTransaction'
 import { Fragment } from 'react'
@@ -6,8 +5,6 @@ import { Fragment } from 'react'
 import { useMessageComposer } from '../../hooks/useMessageComposer'
 import MsgComposer from '../../MessageComposer'
 import { FORMAT_TOOLBAR_GROUPS, formatToolbarButtonKey } from '../Toolbar/formatToolbarLayout'
-
-type Props = { variant: keyof ChatroomVariant }
 
 function FormatButtonGroups() {
   return (
@@ -31,11 +28,11 @@ function FormatButtonGroups() {
   )
 }
 
-export function FormattingToolbar({ variant }: Props) {
+export function FormattingToolbar() {
   const { showFormattingToolbar, editor } = useMessageComposer()
-  useReRenderOnEditorTransaction(editor ?? null)
+  useReRenderOnEditorTransaction(showFormattingToolbar ? editor : null)
 
-  if (!showFormattingToolbar || variant === 'mobile') return null
+  if (!showFormattingToolbar) return null
 
   return (
     <MsgComposer.Toolbar className="composer-bar__format-toolbar border-base-300 bg-base-200 flex min-h-9 w-full items-center gap-0.5 border-b px-2 py-1 sm:min-h-10 sm:px-3">

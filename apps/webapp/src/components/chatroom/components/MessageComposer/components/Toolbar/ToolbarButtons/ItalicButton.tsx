@@ -11,12 +11,14 @@ type Props = {
 
 export const ItalicButton = ({ className, size = 18, ...props }: Props) => {
   const { editor } = useMessageComposer()
+  const active = Boolean(editor?.isActive('italic'))
 
   return (
     <Button
       onPress={() => editor?.chain().focus().toggleItalic().run()}
-      editor={editor}
-      type="italic"
+      isActive={active}
+      aria-label="Italic"
+      aria-pressed={active}
       tooltip="Italic (⌘+I)"
       className={twMerge(
         'btn-ghost rounded-field size-8 min-h-8 min-w-8 shrink-0 border-0 p-0',

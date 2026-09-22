@@ -1,16 +1,15 @@
-import type { ChatroomVariant } from '@components/chatroom/types/chatroom.types'
+import useReRenderOnEditorTransaction from '@hooks/useReRenderOnEditorTransaction'
 import { twMerge } from 'tailwind-merge'
 
 import { useMessageComposer } from '../../hooks/useMessageComposer'
 import { FORMAT_TOOLBAR_FLAT, formatToolbarButtonKey } from '../Toolbar/formatToolbarLayout'
 
-type Props = { variant: keyof ChatroomVariant }
-
 /** Mobile-only compact format grid; desktop uses inline FormattingToolbar. */
-export function ComposerFormatPanel({ variant }: Props) {
-  const { showFormattingToolbar } = useMessageComposer()
+export function ComposerFormatPanel() {
+  const { showFormattingToolbar, editor } = useMessageComposer()
+  useReRenderOnEditorTransaction(showFormattingToolbar ? editor : null)
 
-  if (variant !== 'mobile' || !showFormattingToolbar) return null
+  if (!showFormattingToolbar) return null
 
   return (
     <div
@@ -22,7 +21,7 @@ export function ComposerFormatPanel({ variant }: Props) {
         <Button
           key={formatToolbarButtonKey(Button, index)}
           size={18}
-          className="btn-ghost rounded-field size-10 min-h-10 min-w-10 shrink-0 border-0 p-0"
+          className="btn-ghost rounded-field size-11 min-h-11 min-w-11 shrink-0 border-0 p-0"
           tooltipPosition="top"
         />
       ))}

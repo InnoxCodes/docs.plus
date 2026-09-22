@@ -11,12 +11,14 @@ type Props = {
 
 export const BoldButton = ({ className, size = 18, ...props }: Props) => {
   const { editor } = useMessageComposer()
+  const active = Boolean(editor?.isActive('bold'))
 
   return (
     <Button
       onPress={() => editor?.chain().focus().toggleBold().run()}
-      editor={editor}
-      type="bold"
+      isActive={active}
+      aria-label="Bold"
+      aria-pressed={active}
       tooltip="Bold (⌘+B)"
       className={twMerge(
         'btn-ghost rounded-field size-8 min-h-8 min-w-8 shrink-0 border-0 p-0',

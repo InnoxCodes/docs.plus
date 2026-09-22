@@ -11,12 +11,14 @@ type Props = {
 
 export const BlockquoteButton = ({ className, size = 18, ...props }: Props) => {
   const { editor } = useMessageComposer()
+  const active = Boolean(editor?.isActive('blockquote'))
 
   return (
     <Button
       onPress={() => editor?.chain().focus().toggleBlockquote().run()}
-      editor={editor}
-      type="blockquote"
+      isActive={active}
+      aria-label="Blockquote"
+      aria-pressed={active}
       tooltip="Blockquote (⌘+⇧+9)"
       className={twMerge(
         'btn-ghost rounded-field size-8 min-h-8 min-w-8 shrink-0 border-0 p-0',

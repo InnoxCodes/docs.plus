@@ -9,6 +9,8 @@ export type ComposerAttachment = {
   status: 'uploading' | 'ready' | 'error' | 'expired'
   progress?: number
   error?: string
+  /** The file is over the size limit after downscale, so a Retry cannot make it fit. */
+  tooLarge?: boolean
   /** Row-backed media — do not delete storage on composer clear/cancel. */
   persisted?: boolean
   spoiler?: boolean

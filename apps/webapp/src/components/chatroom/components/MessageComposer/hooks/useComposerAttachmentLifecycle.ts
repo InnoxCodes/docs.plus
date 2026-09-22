@@ -91,10 +91,14 @@ export const useComposerAttachmentLifecycle = ({
     return () => dom.removeEventListener('paste', onPaste)
   }, [addFiles, editor, userId])
 
+  const isComment = Boolean(commentMessageMemory)
+
+  // Set on the live host, not through `editorProps`: the editor is built once per mount.
   useEffect(() => {
     const host = editorRef.current?.querySelector('.ProseMirror')
     if (!(host instanceof HTMLElement)) return
     host.setAttribute('inputmode', 'text')
     host.setAttribute('enterkeyhint', isMobile ? 'enter' : 'send')
-  }, [editor, editorRef, isMobile])
+    host.setAttribute('aria-label', isComment ? 'Add a comment' : 'Write a message')
+  }, [editor, editorRef, isMobile, isComment])
 }

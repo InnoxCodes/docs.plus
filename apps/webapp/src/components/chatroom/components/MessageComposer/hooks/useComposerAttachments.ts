@@ -7,12 +7,19 @@ import {
   useComposerAttachmentsStore
 } from '@components/chatroom/stores/composerAttachmentsStore'
 import { validateChatMediaFile } from '@components/chatroom/utils/chatMediaMime'
-import { ChatMediaUploadRunner } from '@components/chatroom/utils/chatMediaUploadRunner'
+import {
+  ChatMediaUploadRunner,
+  isDownscalableChatImage
+} from '@components/chatroom/utils/chatMediaUploadRunner'
 import {
   CHAT_MEDIA_MAX_ATTACHMENTS,
+  CHAT_MEDIA_MAX_BYTES,
   mediaStoragePath
 } from '@components/chatroom/utils/messageMediaPaths'
-import { deleteChatMediaFromStorage } from '@components/chatroom/utils/uploadChatMedia'
+import {
+  CHAT_MEDIA_TOO_LARGE_ERROR,
+  deleteChatMediaFromStorage
+} from '@components/chatroom/utils/uploadChatMedia'
 import * as toast from '@components/toast'
 import { useChatStore } from '@stores'
 import type { MessageMediaItem } from '@types'
@@ -163,6 +170,11 @@ export const useComposerAttachments = ({ workspaceId, channelId, userId }: Args)
         const validationError = validateChatMediaFile(file)
         if (validationError) {
           toast.Error(validationError)
+          continue
+        }
+        // Only a downscaled image can shrink under the limit, so refuse any other large file now.
+        if (file.size > CHAT_MEDIA_MAX_BYTES && !isDownscalableChatImage(file)) {
+          toast.Error(CHAT_MEDIA_TOO_LARGE_ERROR)
           continue
         }
         const id = crypto.randomUUID()

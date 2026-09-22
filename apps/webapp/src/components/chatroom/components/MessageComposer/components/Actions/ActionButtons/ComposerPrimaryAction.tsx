@@ -70,8 +70,6 @@ export function ComposerPrimaryAction({ voice, className }: Props) {
           'text-primary shrink-0 border-0 p-0 motion-safe:transition-transform motion-safe:duration-100 motion-safe:ease-out motion-safe:active:scale-95',
           className
         )}
-        disabled={!canSend}
-        type="submit"
         data-testid="composer-primary-action"
         onPress={submitMessage}
         onPointerDown={(e: React.PointerEvent<HTMLButtonElement>) => {

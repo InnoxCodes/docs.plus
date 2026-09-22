@@ -11,12 +11,14 @@ type Props = {
 
 export const BulletListButton = ({ className, size = 18, ...props }: Props) => {
   const { editor } = useMessageComposer()
+  const active = Boolean(editor?.isActive('bulletList'))
 
   return (
     <Button
       onPress={() => editor?.chain().focus().toggleBulletList().run()}
-      editor={editor}
-      type="bulletList"
+      isActive={active}
+      aria-label="Bullet list"
+      aria-pressed={active}
       tooltip="Bullet List (⌘+⇧+7)"
       className={twMerge(
         'btn-ghost rounded-field size-8 min-h-8 min-w-8 shrink-0 border-0 p-0',

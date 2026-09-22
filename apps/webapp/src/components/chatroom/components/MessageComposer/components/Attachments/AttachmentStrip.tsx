@@ -16,7 +16,15 @@ const MediaIcon = ({ kind }: { kind: ReturnType<typeof inferMessageMediaKind> | 
   return <Icons.image size={16} className="shrink-0 stroke-[1.75]" />
 }
 
-function UploadProgressRing({ progress, className }: { progress: number; className?: string }) {
+function UploadProgressRing({
+  progress,
+  label,
+  className
+}: {
+  progress: number
+  label: string
+  className?: string
+}) {
   return (
     <div
       className={twMerge(
@@ -31,10 +39,12 @@ function UploadProgressRing({ progress, className }: { progress: number; classNa
         } as CSSProperties
       }
       role="progressbar"
+      aria-label={`Uploading ${label}`}
       aria-valuenow={progress}
       aria-valuemin={0}
       aria-valuemax={100}>
-      {progress}%
+      {/* Hidden so each percent step changes no readable text in the strip's live region. */}
+      <span aria-hidden="true">{progress}%</span>
     </div>
   )
 }
@@ -55,10 +65,11 @@ const AttachmentChip = ({
   const previewUrl = signedPreviewUrl ?? blobUrl
   const isUploading = attachment.status === 'uploading'
   const isError = attachment.status === 'error'
+  const canRetry = isError && !attachment.tooLarge
   // A restored row whose upload is gone. It has no file, so it offers Remove but no Retry.
   const isExpired = attachment.status === 'expired'
   const showsError = isError || isExpired
-  const expiredLabel = isExpired ? 'Upload expired' : undefined
+  const errorLabel = isExpired ? 'Upload expired' : attachment.error
   const progress = attachment.progress ?? 0
 
   // Local image preview while uploading. Keyed on the stable File so per-tick progress
@@ -98,63 +109,68 @@ const AttachmentChip = ({
       </p>
     )
   } else if (isExpired) {
-    statusLine = <p className="text-error text-[10px]">{expiredLabel}</p>
+    statusLine = <p className="text-error text-[10px]">{errorLabel}</p>
   } else if (attachment.status === 'ready') {
     statusLine = <p className="text-base-content/60 text-[10px]">Ready to send</p>
   }
 
   if (compact) {
     return (
+      // Remove sits beside the tile, not on it, so its 44 px target never overlaps full-tile Retry.
       <div
         className={twMerge(
-          'relative size-10 shrink-0',
-          showsError && 'ring-error/50 rounded-field ring-1'
+          'rounded-field flex shrink-0 items-center',
+          showsError && 'ring-error/50 ring-1'
         )}>
-        {previewUrl ? (
-          <img
-            src={previewUrl}
-            alt=""
-            className={twMerge(
-              'rounded-field size-full object-cover',
-              isUploading && 'opacity-45',
-              attachment.spoiler && 'blur-sm'
-            )}
-          />
-        ) : (
-          <div
-            className={twMerge(
-              'bg-base-200 rounded-field flex size-full items-center justify-center',
-              showsError && 'bg-error/10'
-            )}>
-            {showsError ? (
+        <div className="relative size-11 shrink-0">
+          {previewUrl ? (
+            <img
+              src={previewUrl}
+              alt=""
+              className={twMerge(
+                'rounded-field size-full object-cover',
+                isUploading && 'opacity-45',
+                attachment.spoiler && 'blur-sm'
+              )}
+            />
+          ) : (
+            <div
+              className={twMerge(
+                'bg-base-200 rounded-field flex size-full items-center justify-center',
+                showsError && 'bg-error/10'
+              )}>
+              {showsError ? null : <MediaIcon kind={kind} />}
+            </div>
+          )}
+          {isUploading ? <UploadProgressRing progress={progress} label={label} /> : null}
+          {/* Only this overlay draws the alert, so glyphs never stack. Retry has its own glyph. */}
+          {showsError && !canRetry ? (
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
               <Icons.alert
                 size={14}
                 className="text-error shrink-0 stroke-[1.75]"
-                title={expiredLabel}
-                aria-label={expiredLabel}
+                title={errorLabel}
+                aria-label={errorLabel}
               />
-            ) : (
-              <MediaIcon kind={kind} />
-            )}
-          </div>
-        )}
-        {isUploading ? <UploadProgressRing progress={progress} /> : null}
-        {isError ? (
-          <button
-            type="button"
-            className="focus-visible:ring-primary/40 rounded-field absolute inset-0 flex items-center justify-center focus-visible:ring-2 focus-visible:outline-none"
-            aria-label={`Retry upload for ${label}`}
-            title={attachment.error ?? 'Retry upload'}
-            onClick={() => retryAttachment(attachment.id)}>
-            <Icons.sync size={14} className="text-error shrink-0 stroke-[1.75]" />
-          </button>
-        ) : null}
+            </div>
+          ) : null}
+          {canRetry ? (
+            <button
+              type="button"
+              className="focus-visible:ring-primary/40 rounded-field absolute inset-0 flex items-center justify-center focus-visible:ring-2 focus-visible:outline-none"
+              aria-label={`Retry upload for ${label}`}
+              title={attachment.error ?? 'Retry upload'}
+              onClick={() => retryAttachment(attachment.id)}>
+              <Icons.sync size={14} className="text-error shrink-0 stroke-[1.75]" />
+            </button>
+          ) : null}
+        </div>
         <button
           type="button"
-          className="btn btn-circle btn-xs bg-base-100 absolute -top-1 -right-1 h-5 min-h-0 w-5 shadow-sm"
+          className="btn btn-ghost btn-square size-11 min-h-11 min-w-11 shrink-0"
           aria-label={`Remove ${label}`}
           onClick={() => removeAttachment(attachment.id)}>
-          <Icons.close size={10} className="stroke-[1.75]" />
+          <Icons.close size={14} className="stroke-[1.75]" />
         </button>
       </div>
     )
@@ -187,7 +203,7 @@ const AttachmentChip = ({
               {fullPlaceholderIcon}
             </div>
           )}
-          {isUploading ? <UploadProgressRing progress={progress} /> : null}
+          {isUploading ? <UploadProgressRing progress={progress} label={label} /> : null}
         </div>
 
         <div className="min-w-0 flex-1">
@@ -229,7 +245,7 @@ const AttachmentChip = ({
         </div>
       ) : null}
 
-      {isError ? (
+      {canRetry ? (
         <div className="text-error flex items-center gap-1.5 text-[10px]">
           <span>Upload failed</span>
           <span aria-hidden="true" className="text-base-content/30">

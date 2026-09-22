@@ -11,12 +11,14 @@ type Props = {
 
 export const CodeButton = ({ className, size = 18, ...props }: Props) => {
   const { editor } = useMessageComposer()
+  const active = Boolean(editor?.isActive('inlineCode'))
 
   return (
     <Button
       onPress={() => editor?.chain().focus().toggleInlineCode().run()}
-      editor={editor}
-      type="code"
+      isActive={active}
+      aria-label="Inline code"
+      aria-pressed={active}
       tooltip="Inline code"
       className={twMerge(
         'btn-ghost rounded-field size-8 min-h-8 min-w-8 shrink-0 border-0 p-0',

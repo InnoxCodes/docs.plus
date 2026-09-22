@@ -11,12 +11,14 @@ type Props = {
 
 export const StrikethroughButton = ({ className, size = 18, ...props }: Props) => {
   const { editor } = useMessageComposer()
+  const active = Boolean(editor?.isActive('strike'))
 
   return (
     <Button
       onPress={() => editor?.chain().focus().toggleStrike().run()}
-      editor={editor}
-      type="strike"
+      isActive={active}
+      aria-label="Strikethrough"
+      aria-pressed={active}
       tooltip="Strikethrough (⌘+⇧+S)"
       className={twMerge(
         'btn-ghost rounded-field size-8 min-h-8 min-w-8 shrink-0 border-0 p-0',

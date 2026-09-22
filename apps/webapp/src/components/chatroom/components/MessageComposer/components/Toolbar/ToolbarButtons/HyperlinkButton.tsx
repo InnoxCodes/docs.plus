@@ -12,6 +12,7 @@ type Props = {
 
 export const HyperlinkButton = ({ className, size = 18, ...props }: Props) => {
   const { editor } = useMessageComposer()
+  const active = Boolean(editor?.isActive('hyperlink'))
 
   return (
     <Button
@@ -20,8 +21,8 @@ export const HyperlinkButton = ({ className, size = 18, ...props }: Props) => {
         if (editor) snapshotComposerLinkSelection(editor)
       }}
       onPress={() => editor?.commands.openCreateHyperlinkPopover()}
-      editor={editor}
-      type="hyperlink"
+      isActive={active}
+      aria-label="Hyperlink"
       tooltip="Hyperlink (⌘+K)"
       className={twMerge(
         'btn-ghost rounded-field size-8 min-h-8 min-w-8 shrink-0 border-0 p-0',

@@ -11,6 +11,8 @@ import {
   positiveMediaDims
 } from './messageMediaPaths'
 
+export const CHAT_MEDIA_TOO_LARGE_ERROR = 'File must be 10 MB or smaller'
+
 export type UploadChatMediaOptions = {
   onProgress?: (percent: number) => void
   signal?: AbortSignal
@@ -86,7 +88,7 @@ export async function uploadChatMedia(
   options: UploadChatMediaOptions = {}
 ): Promise<MessageMediaItem> {
   if (file.size > CHAT_MEDIA_MAX_BYTES) {
-    throw new Error('File must be 10 MB or smaller')
+    throw new Error(CHAT_MEDIA_TOO_LARGE_ERROR)
   }
 
   const type = inferMessageMediaKind(file)

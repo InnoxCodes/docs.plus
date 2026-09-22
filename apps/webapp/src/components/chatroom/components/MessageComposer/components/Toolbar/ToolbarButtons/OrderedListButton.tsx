@@ -11,12 +11,14 @@ type Props = {
 
 export const OrderedListButton = ({ className, size = 18, ...props }: Props) => {
   const { editor } = useMessageComposer()
+  const active = Boolean(editor?.isActive('orderedList'))
 
   return (
     <Button
       onPress={() => editor?.chain().focus().toggleOrderedList().run()}
-      editor={editor}
-      type="orderedList"
+      isActive={active}
+      aria-label="Numbered list"
+      aria-pressed={active}
       tooltip="Numbered List (⌘+⇧+8)"
       className={twMerge(
         'btn-ghost rounded-field size-8 min-h-8 min-w-8 shrink-0 border-0 p-0',

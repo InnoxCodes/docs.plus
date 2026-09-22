@@ -4,6 +4,7 @@ import {
   mediaStoragePath
 } from '@components/chatroom/utils/messageMediaPaths'
 import {
+  CHAT_MEDIA_TOO_LARGE_ERROR,
   deleteChatMediaFromStorage,
   uploadChatMedia
 } from '@components/chatroom/utils/uploadChatMedia'
@@ -13,8 +14,12 @@ const MIN_BYTES_TO_PROCESS = 512 * 1024
 const JPEG_QUALITY = 0.82
 const SKIP_IMAGE_TYPES = new Set(['image/gif', 'image/heic', 'image/heif'])
 
+// Reads the raw `file.type`, as the downscale does, so the add-time size check agrees with it.
+export const isDownscalableChatImage = (file: File): boolean =>
+  file.type.startsWith('image/') && !SKIP_IMAGE_TYPES.has(file.type)
+
 async function downscaleChatMediaImage(file: File): Promise<File> {
-  if (!file.type.startsWith('image/') || SKIP_IMAGE_TYPES.has(file.type)) return file
+  if (!isDownscalableChatImage(file)) return file
 
   let bitmap: ImageBitmap
   try {
@@ -183,6 +188,7 @@ export class ChatMediaUploadRunner {
                 status: 'uploading',
                 progress: 0,
                 error: undefined,
+                tooLarge: undefined,
                 item: undefined
               }
             : attachment
@@ -219,7 +225,13 @@ export class ChatMediaUploadRunner {
         this.ctx.setAttachments((prev) =>
           prev.map((attachment) =>
             attachment.id === id
-              ? { ...attachment, status: 'error', error: message, progress: undefined }
+              ? {
+                  ...attachment,
+                  status: 'error',
+                  error: message,
+                  progress: undefined,
+                  tooLarge: message === CHAT_MEDIA_TOO_LARGE_ERROR
+                }
               : attachment
           )
         )

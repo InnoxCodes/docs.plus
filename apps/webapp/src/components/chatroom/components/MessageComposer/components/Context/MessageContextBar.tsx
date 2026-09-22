@@ -6,6 +6,8 @@ import {
 import type { ReactNode } from 'react'
 import { twMerge } from 'tailwind-merge'
 
+import { useMessageComposer } from '../../hooks/useMessageComposer'
+
 export type ContextBarKind = 'reply' | 'comment' | 'edit'
 
 const STATIC_SHELL: Record<Exclude<ContextBarKind, 'comment'>, { bar: string; icon: string }> = {
@@ -44,6 +46,7 @@ function resolveShell(props: MessageContextBarProps): { bar: string; icon: strin
 export function MessageContextBar(props: MessageContextBarProps) {
   const { icon, onDismiss, dismissLabel, children } = props
   const shell = resolveShell(props)
+  const { isMobile } = useMessageComposer()
 
   return (
     <div
@@ -55,7 +58,12 @@ export function MessageContextBar(props: MessageContextBarProps) {
       <div className="text-base-content flex min-w-0 flex-1 flex-col gap-0.5 text-sm">
         {children}
       </div>
-      <CloseButton onClick={onDismiss} size="xs" aria-label={dismissLabel} className="shrink-0" />
+      <CloseButton
+        onClick={onDismiss}
+        size="xs"
+        aria-label={dismissLabel}
+        className={twMerge('shrink-0', isMobile && 'min-h-11 min-w-11')}
+      />
     </div>
   )
 }
