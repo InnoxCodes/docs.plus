@@ -12,6 +12,13 @@ This file is the product changelog. The webapp package keeps [`apps/webapp/CHANG
 
 ### Added
 
+- Show what a chat member is doing besides typing. A small smile on their
+  avatar means they are choosing an emoji, and a mic means they are recording
+  a voice note. The chip shows in the chat header and on the heading's row in
+  the table of contents. It bounces for about five seconds and then rests.
+  With reduced motion it stays still. A face shows one thing at a time, so
+  the typing bounce stops while a chip shows. Reactions do not show a chip.
+
 - Show a Pad title rename in History and in workspace chat. After a signed-in
   rename, chat shows who changed it and the old and new titles. History paints
   the latest live notice above the editor and uses the snapshot username. Chat
@@ -62,6 +69,51 @@ This file is the product changelog. The webapp package keeps [`apps/webapp/CHANG
   date that could be months after you really left.
 
 ### Fixed
+
+- Mark your first message in an empty chat as sent. It was saved at once, but
+  it kept the clock icon until you reloaded the page.
+
+- Keep a chat message you send while scrolled far up. The jump to the newest
+  messages could drop it from the list. If that send then failed, its text was
+  lost.
+
+- Keep your chat draft and files across sends, replies, edits, and comments. A
+  failed comment gives back its text, its mode, and its files. Ending a reply or
+  a comment no longer deletes a file you just sent.
+
+- Let Escape close only what is on top. Closing the mention list, a link
+  popover, or the media gallery no longer also cancels a reply, an edit, or a
+  comment. Starting a voice note closes the emoji panel.
+
+- Split a long chat message by the length the database stores. A piece no
+  longer fails or holds no text. An edit that is too long is refused before it
+  saves, and your text stays in the composer.
+
+- Make hold-to-record on a phone answer to release, slide to lock, slide to
+  cancel, and the 5-minute limit. Cancel discards the note. Letting go while
+  the browser asks for the microphone turns the microphone off.
+
+- Notify the right people when a chat message holds an @. A capital letter
+  after a username no longer mentions a shorter name. An email address in a
+  message no longer stops the alert to members on All notifications. Your own
+  message never mentions you.
+
+- Bounce the avatar of a chat member who is typing. The bounce was defined but
+  never played, because another animation on the same face replaced it.
+
+- Make the chat composer work with a keyboard, a screen reader, and touch. Each
+  button's name matches its tooltip, and each format button says when it is on,
+  on the phone grid too. The + menu, the mention list, and the emoji panel work
+  from the keyboard. Small controls on a phone are 44 px targets.
+
+- Fix smaller chat composer faults. A file over 10 MB is refused when you add
+  it, unless it is a picture that can shrink. A file that cannot fit shows no
+  Retry. A failed chat load shows the error, not a skeleton that never ends. An
+  edit with nothing left shows the mic, not a Send that fails. Add link and Edit
+  link put the cursor in the address field. Opening a comment focuses the right
+  composer. Strikethrough survives a send, and the composer no longer offers a
+  heading or a divider that a send removes. The first comment on a heading with
+  no chat works for a user who joined late.
 
 - Keep Pad title open on a document with no owner. First edit no longer stamps
   the signed-in visitor as owner, so anyone can rename it. An owned document

@@ -23,11 +23,47 @@ plus the house order in [`RELEASE_POLICY.md`](../../RELEASE_POLICY.md).
   A Documents-list rename of the open pad writes the header and relays the
   room when a provider exists.
 
+- `AvatarStack` `showActivity` paints an activity chip (`Icons.emoji` or
+  `Icons.mic`) on a face's top-right corner, in `ParticipantsList` and
+  `TocRowTrail`. It pops in over 200 ms, then plays `avatar-typing` 6 times
+  (4.8 s, under the 5 s line in WCAG 2.2.2). The wire is `startActivity` /
+  `stopActivity` on `typingIndicator`: 300 ms start delay, 3 s keepalive, 8 s
+  expiry.
+
 ### Changed
 
 - The sign-in form checks the email on rest-api, not on Next.
 
+- The composer + menu is a dialog named Insert, with plain buttons and no
+  menu roles.
+
+- On a phone, the small composer controls grow to 44 px (`min-h-11 min-w-11`).
+  Each attachment tile gets a 44 px remove button beside it.
+
+- An own optimistic chat row carries `data-status` (`pending` or `failed`) on
+  the card root. The status paints in the timestamp slot.
+
 ### Fixed
+
+- The typing keyframe never ran. `.animate-badge-entry` came after
+  `.avatar-typing` with the same specificity, so it won `animation`. A combined
+  rule now plays both.
+
+- `useChannelMessages` set `newestSeqRef` to null for an empty first window.
+  The realtime drain reads null as "not loaded", so the first echo never
+  merged. An empty first window now sets 0.
+
+- `useJumpTo` waits until the new window lands. A send far from the tail
+  appended into the old window, and the landing dropped the optimistic row.
+
+- The desktop composer skeleton matches the loaded composer's geometry. A
+  channel load error renders no composer and no skeleton.
+
+- The composer input has no positive `tabindex`. Inline code and the mobile
+  format grid show their active state.
+
+- The composer link dialog opens and closes on the dialog motion tokens
+  (`MOTION_DIALOG_IN_MS` / `MOTION_DIALOG_OUT_MS`).
 
 - An ownerless Pad title stays editable after the metadata fetch. A missing
   or empty `ownerId` is open. The control waits for `documentId` so a
@@ -45,6 +81,14 @@ plus the house order in [`RELEASE_POLICY.md`](../../RELEASE_POLICY.md).
 ### Internal
 
 - Tab close holds the JWT in a ref and PATCHes `users` with keepalive.
+
+- Chat stores and broadcast payloads have real types, not `any`. The unused
+  typing map, the dead pin listener, and dead composer code are gone. The
+  composer `ToolbarButton` takes a plain `isActive`.
+
+- The desktop emoji picker no longer re-renders on every chat store change.
+
+- The chat agent docs and the design system match the code again.
 
 ## [2.0.1] — 2026-08-31
 
