@@ -1,6 +1,6 @@
+import type { TMsgRow } from './api'
 import type { CommentAnchorV1 } from './comment'
 import type { Profile } from './domain'
-import type { MessageMediaItem } from './message'
 
 export type CommentMessageMemory = {
   anchor: CommentAnchorV1
@@ -10,15 +10,10 @@ export type CommentMessageMemory = {
 }
 
 /** Reply/edit composer context — subset of message row fields the UI needs. */
-export type ComposerMessageMemory = {
-  id?: string
-  channel_id?: string
-  content?: string
-  html?: string | null
-  medias?: MessageMediaItem[] | null
-  type?: string | null
-  user_details?: { fullname?: string; username?: string }
-}
+export type ComposerMessageMemory = Pick<
+  TMsgRow,
+  'id' | 'channel_id' | 'content' | 'html' | 'medias' | 'type' | 'user_details'
+>
 
 export type TChannelSettings = {
   name: any
@@ -27,8 +22,8 @@ export type TChannelSettings = {
   isUserChannelMember?: boolean
   isUserChannelOwner?: boolean
   isUserChannelAdmin?: boolean
-  replyMessageMemory?: any | null
+  replyMessageMemory?: ComposerMessageMemory | null
   commentMessageMemory?: CommentMessageMemory | null
-  editMessageMemory?: any | null
+  editMessageMemory?: ComposerMessageMemory | null
   member_count?: number
 }

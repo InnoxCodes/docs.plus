@@ -25,8 +25,9 @@ const DesktopLayout = () => {
   // the handler identity stays stable.
   const handleSelect = useCallback((native: string) => {
     const chat = useChatStore.getState()
+    const message = chat.emojiPicker.selectedMessage
     if (chat.emojiPicker.eventType === 'reactToMessage') {
-      emojiReaction(chat.emojiPicker.selectedMessage, native)
+      if (message) emojiReaction(message, native)
     } else {
       chat.chatRoom.editorInstance?.commands.insertContent(native)
     }

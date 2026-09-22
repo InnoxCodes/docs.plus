@@ -1,7 +1,6 @@
 import { dismissComposerEmojiAndMentionOverlays } from '@components/chatroom/components/MessageComposer/helpers/dismissComposerOverlays'
 import { useAuthStore, useChatStore, useStore } from '@stores'
 import type { CommentAnchorV1, Profile } from '@types'
-import { retryWithBackoff } from '@utils/retryWithBackoff'
 import { scrollToHeading } from '@utils/scrollToHeading'
 
 /** Release pad edit mode; the blur is what dismisses the iOS soft keyboard. */
@@ -53,75 +52,34 @@ function anchorDraftForChatroom(): void {
   if (meta.get('isDraft')) meta.set('isDraft', false)
 }
 
-const FOCUS_RETRY = { maxAttempts: 6, initialDelayMs: 600, maxDelayMs: 1000 }
-
-/**
- * A closed pane unmounts its subtree, so a live `editorInstance` already means the
- * composer is mounted. No separate surface-open check is needed.
- */
-function focusChatEditor(): boolean {
-  const { editorInstance } = useChatStore.getState().chatRoom
-  if (!editorInstance) return false
-
-  editorInstance.commands.focus()
-  return true
-}
-
-export function focusChatComposerWithRetry(): void {
-  retryWithBackoff(focusChatEditor, FOCUS_RETRY)
-}
-
-export function insertChatComposerContentWithRetry(insertContent: string): void {
-  retryWithBackoff(
-    () => {
-      const { editorInstance } = useChatStore.getState().chatRoom
-      if (!editorInstance) return false
-
-      editorInstance.chain().focus().insertContent(insertContent).run()
-      return true
-    },
-    {
-      ...FOCUS_RETRY,
-      onRetry: (attempt, error) => {
-        console.info(`Attempt ${attempt} failed: ${error.message}. Retrying...`)
-      }
-    }
-  )
-}
-
-type ScheduleOpenHeadingChatroomParams = {
+type OpenHeadingChatroomPaneParams = {
   headingId: string
   workspaceId: string | undefined
   user: Profile | null
   fetchMsgsFromId?: string
-  onPaneOpen?: () => void
 }
 
-function scheduleOpenHeadingChatroomPane({
+function openHeadingChatroomPane({
   headingId,
   workspaceId,
   user,
-  fetchMsgsFromId,
-  onPaneOpen
-}: ScheduleOpenHeadingChatroomParams): void {
-  if (workspaceId) {
-    const chat = useChatStore.getState()
-    chat.setChatRoom(headingId, workspaceId, [], user, fetchMsgsFromId)
-    // Only seed the mode on a fresh open; switching headings must not yank a
-    // reader who is deliberately holding `half`.
-    if (chat.chatRoom.paneMode === 'closed') chat.setPaneMode('expanded')
-  }
-  onPaneOpen?.()
+  fetchMsgsFromId
+}: OpenHeadingChatroomPaneParams): void {
+  if (!workspaceId) return
+  const chat = useChatStore.getState()
+  chat.setChatRoom(headingId, workspaceId, user, fetchMsgsFromId)
+  // Only seed the mode on a fresh open; switching headings must not yank a
+  // reader who is deliberately holding `half`.
+  if (chat.chatRoom.paneMode === 'closed') chat.setPaneMode('expanded')
 }
 
-export type OpenHeadingChatroomParams = {
+type OpenHeadingChatroomParams = {
   headingId: string
   intent: 'comment' | 'browse'
   anchor?: CommentAnchorV1
   scroll2Heading?: boolean
   fetchMsgsFromId?: string
   focusEditor?: boolean
-  insertContent?: string | null
 }
 
 export function openHeadingChatroom({
@@ -130,8 +88,7 @@ export function openHeadingChatroom({
   anchor,
   scroll2Heading = false,
   fetchMsgsFromId,
-  focusEditor = false,
-  insertContent = null
+  focusEditor = false
 }: OpenHeadingChatroomParams): void {
   const { workspaceId } = useStore.getState().settings
   const chatStore = useChatStore.getState()
@@ -143,6 +100,13 @@ export function openHeadingChatroom({
   anchorDraftForChatroom()
 
   chatStore.switchChatRoom(headingId)
+  // Every open overwrites the request, so a stale one never focuses a later composer.
+  chatStore.setOrUpdateChatRoom(
+    'composerFocusRequest',
+    intent === 'comment' || focusEditor
+      ? { headingId, focusOrigin: document.activeElement }
+      : undefined
+  )
 
   const paneOpen = { headingId, workspaceId, user }
 
@@ -157,50 +121,23 @@ export function openHeadingChatroom({
     })
     exitDocEditModeForSheet()
 
-    if (headingId === openedHeadingId && openedMode !== 'closed') {
-      focusChatComposerWithRetry()
-      return
-    }
+    if (headingId === openedHeadingId && openedMode !== 'closed') return
 
-    scheduleOpenHeadingChatroomPane({ ...paneOpen, onPaneOpen: focusChatComposerWithRetry })
+    openHeadingChatroomPane(paneOpen)
     return
   }
 
-  scheduleOpenHeadingChatroomPane({
-    ...paneOpen,
-    fetchMsgsFromId,
-    onPaneOpen: scroll2Heading ? () => scrollToHeading(headingId) : undefined
-  })
+  openHeadingChatroomPane({ ...paneOpen, fetchMsgsFromId })
+  if (scroll2Heading) scrollToHeading(headingId)
   exitDocEditModeForSheet()
-  if (insertContent) insertChatComposerContentWithRetry(insertContent)
-  if (focusEditor) focusChatComposerWithRetry()
 }
 
 export function openCommentComposer(anchor: CommentAnchorV1): void {
   openHeadingChatroom({ headingId: anchor.heading_id, intent: 'comment', anchor })
 }
 
-type OpenHeadingChatBrowseParams = {
-  headingId: string
-  scroll2Heading?: boolean
-  fetchMsgsFromId?: string
-  focusEditor?: boolean
-  insertContent?: string | null
-}
-
-export function openHeadingChatBrowse({
-  headingId,
-  scroll2Heading = false,
-  fetchMsgsFromId,
-  focusEditor = false,
-  insertContent = null
-}: OpenHeadingChatBrowseParams): void {
-  openHeadingChatroom({
-    headingId,
-    intent: 'browse',
-    scroll2Heading,
-    fetchMsgsFromId,
-    focusEditor,
-    insertContent
-  })
+export function openHeadingChatBrowse(
+  params: Omit<OpenHeadingChatroomParams, 'intent' | 'anchor'>
+): void {
+  openHeadingChatroom({ ...params, intent: 'browse' })
 }

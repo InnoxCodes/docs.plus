@@ -26,12 +26,6 @@ export const usePinMessageHandler = () => {
         } else {
           removeChannelPinnedMessage(message.channel_id, message.id)
         }
-
-        // await workspaceBroadcaster.send({
-        //   type: 'broadcast',
-        //   event: 'pinnedMessage',
-        //   payload: { message: messageData, actionType }
-        // })
       }
     },
     [addChannelPinnedMessage, removeChannelPinnedMessage]

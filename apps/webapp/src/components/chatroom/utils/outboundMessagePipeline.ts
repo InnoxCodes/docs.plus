@@ -1,8 +1,8 @@
 import type { SendDraft, SendResult } from '@components/chatroom/types/send.types'
 import { ensureChatMediaInsertReady } from '@components/chatroom/utils/chatMediaStorageReadiness'
-import { editHadPersistedMedias } from '@components/chatroom/utils/composerSendGate'
 import {
   messageMediasForInsert,
+  parseMessageMedias,
   resolveOutgoingMessageType
 } from '@components/chatroom/utils/messageMediaPaths'
 import type { Editor } from '@tiptap/react'
@@ -62,7 +62,7 @@ const resolveEditMediasPatch = (
   mediasForInsert: MessageMediaItem[] | null
 ): EditMediasPatch | undefined => {
   if (!editMessageMemory) return undefined
-  const hadPersisted = editHadPersistedMedias(editMessageMemory)
+  const hadPersisted = parseMessageMedias(editMessageMemory.medias).length > 0
   if (!hadPersisted && readyMedias.length === 0) return { kind: 'omit' }
   if (readyMedias.length === 0 && hadPersisted) return { kind: 'clear' }
   return { kind: 'set', medias: mediasForInsert ?? [] }
@@ -261,7 +261,7 @@ export async function dispatchOutboundChunk(
   const payload = buildOutboundChunkPayload(prepared, content, html, chunkIndex)
 
   if (prepared.mode.kind === 'edit') {
-    await deps.updateMsg(content, html, prepared.mode.editMemory.id!, {
+    await deps.updateMsg(content, html, prepared.mode.editMemory.id, {
       ...(payload.medias !== undefined ? { medias: payload.medias } : {}),
       type: payload.type
     })

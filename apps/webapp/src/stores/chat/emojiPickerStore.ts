@@ -1,3 +1,4 @@
+import type { TMsgRow } from '@types'
 import { immer } from 'zustand/middleware/immer'
 
 export type EmojiPickerPosition = {
@@ -5,14 +6,13 @@ export type EmojiPickerPosition = {
   left: number
 }
 
-export type EmojiPickerEventType = 'reactToMessage' | 'insertEmojiToEditor' | 'insertEmojiToMessage'
+export type EmojiPickerEventType = 'reactToMessage' | 'insertEmojiToEditor'
 
 type EmojiPickerState = {
   isOpen: boolean
   position: EmojiPickerPosition
-  selectedMessage: any | null
+  selectedMessage: TMsgRow | null
   eventType: EmojiPickerEventType | null
-  editor: any | null
 }
 
 interface IEmojiPickerStore {
@@ -20,14 +20,7 @@ interface IEmojiPickerStore {
   openEmojiPicker: (
     position: EmojiPickerPosition,
     eventType: EmojiPickerEventType,
-    message?: any,
-    editor?: any
-  ) => void
-  toggleEmojiPicker: (
-    position: EmojiPickerPosition,
-    eventType: EmojiPickerEventType,
-    message?: any,
-    editor?: any
+    message?: TMsgRow
   ) => void
   closeEmojiPicker: () => void
 }
@@ -37,30 +30,16 @@ const emojiPickerStore = immer<IEmojiPickerStore>((set, _get) => ({
     isOpen: false,
     position: { top: 0, left: 0 },
     selectedMessage: null,
-    eventType: null,
-    editor: null
+    eventType: null
   },
 
-  openEmojiPicker: (position, eventType, message = null, editor = null) => {
+  openEmojiPicker: (position, eventType, message) => {
     set((state) => {
       state.emojiPicker = {
         isOpen: true,
         position,
         eventType,
-        selectedMessage: message,
-        editor
-      }
-    })
-  },
-
-  toggleEmojiPicker: (position, eventType, message = null, editor = null) => {
-    set((state) => {
-      state.emojiPicker = {
-        isOpen: !state.emojiPicker.isOpen,
-        position,
-        eventType,
-        selectedMessage: message,
-        editor
+        selectedMessage: message ?? null
       }
     })
   },
@@ -71,8 +50,7 @@ const emojiPickerStore = immer<IEmojiPickerStore>((set, _get) => ({
         isOpen: false,
         position: { top: 0, left: 0 },
         selectedMessage: null,
-        eventType: null,
-        editor: null
+        eventType: null
       }
     })
   }

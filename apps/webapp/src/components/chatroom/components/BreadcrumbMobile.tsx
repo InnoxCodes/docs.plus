@@ -6,7 +6,7 @@ import { type HeadingBreadcrumbItem, resolveHeadingBreadcrumbs } from '../utils/
 import { ChatroomBreadcrumbSkeleton } from './skeleton'
 
 const BreadcrumbMobile = () => {
-  const updateChatRoom = useChatStore((state) => state.updateChatRoom)
+  const setOrUpdateChatRoom = useChatStore((state) => state.setOrUpdateChatRoom)
   const { headingId } = useChatStore((state) => state.chatRoom)
   const [headingPath, setHeadingPath] = useState<HeadingBreadcrumbItem[]>([])
 
@@ -23,9 +23,9 @@ const BreadcrumbMobile = () => {
     const headingAddress = resolveHeadingBreadcrumbs(editor, headingId)
     if (!headingAddress) return
 
-    updateChatRoom('headingPath', headingAddress)
+    setOrUpdateChatRoom('headingPath', headingAddress)
     setHeadingPath(headingAddress)
-  }, [headingId, editor, providerSyncing, loading, workspaceId, updateChatRoom])
+  }, [headingId, editor, providerSyncing, loading, workspaceId, setOrUpdateChatRoom])
 
   if (workspaceId === headingId) {
     return (

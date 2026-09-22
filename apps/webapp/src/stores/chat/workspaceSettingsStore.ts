@@ -1,11 +1,9 @@
-import { CommentMessageMemory, TChannelSettings } from '@types'
+import { CommentMessageMemory, ComposerMessageMemory, TChannelSettings } from '@types'
 import { immer } from 'zustand/middleware/immer'
 
 type WorkspaceSettings = {
   workspaceId?: string
   workspaceBroadcaster?: any
-  activeChannelId?: string // we use this id for typing indicators
-  typingIndicators: { [key: string]: Map<string, any> }
   channels: Map<string, TChannelSettings>
 }
 
@@ -14,10 +12,8 @@ export interface IWorkspaceSettingsStore {
   setWorkspaceChannelSetting: (channelId: string, key: keyof TChannelSettings, value: any) => void
   setWorkspaceSetting: (key: keyof WorkspaceSettings, value: any) => void
   setCommentMessageMemory: (channelId: string, message: CommentMessageMemory | null) => void
-  setReplyMessageMemory: (channelId: string, message: any) => void
-  setEditMessageMemory: (channelId: string, message: any) => void
-  setTypingIndicator: (channelId: string, user: any) => void
-  removeTypingIndicator: (channelId: string, user: any) => void
+  setReplyMessageMemory: (channelId: string, message: ComposerMessageMemory | null) => void
+  setEditMessageMemory: (channelId: string, message: ComposerMessageMemory | null) => void
   clearMemoryStates: (channelId: string) => void
 }
 
@@ -25,9 +21,7 @@ const useWorkspaceSettingsStore = immer<IWorkspaceSettingsStore>((set) => ({
   workspaceSettings: {
     workspaceId: undefined,
     workspaceBroadcaster: undefined,
-    channels: new Map(),
-    activeChannelId: undefined,
-    typingIndicators: {}
+    channels: new Map()
   },
 
   setWorkspaceChannelSetting: (channelId, key, value) => {
@@ -55,28 +49,6 @@ const useWorkspaceSettingsStore = immer<IWorkspaceSettingsStore>((set) => ({
 
   setEditMessageMemory: (channelId, message) => {
     setMemory(set, 'editMessageMemory', channelId, message)
-  },
-
-  setTypingIndicator: (channelId, user) => {
-    return set((state) => {
-      const typingIndicators = state.workspaceSettings.typingIndicators
-
-      if (!typingIndicators[channelId]) {
-        typingIndicators[channelId] = new Map()
-      }
-
-      typingIndicators[channelId].set(user.id, user)
-    })
-  },
-
-  removeTypingIndicator: (channelId, user) => {
-    return set((state) => {
-      const typingIndicators = state.workspaceSettings.typingIndicators
-
-      if (typingIndicators[channelId]) {
-        typingIndicators[channelId].delete(user.id)
-      }
-    })
   },
 
   clearMemoryStates: (channelId) => {

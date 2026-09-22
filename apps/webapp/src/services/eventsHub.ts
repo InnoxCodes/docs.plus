@@ -33,7 +33,6 @@ type TOpenChatData = {
   toggleRoom?: boolean
   fetchMsgsFromId?: string
   focusEditor?: boolean
-  insertContent?: string | null
 }
 
 type TApplyFilterData = {
@@ -64,8 +63,7 @@ export const eventsHub = (router: NextRouter) => {
         scroll2Heading = false,
         toggleRoom = true,
         fetchMsgsFromId,
-        focusEditor = false,
-        insertContent = null
+        focusEditor = false
       } = data
 
       if (!headingId) return
@@ -83,8 +81,7 @@ export const eventsHub = (router: NextRouter) => {
         headingId,
         scroll2Heading,
         fetchMsgsFromId,
-        focusEditor,
-        insertContent
+        focusEditor
       })
     }),
 

@@ -7,8 +7,8 @@ import { useCallback } from 'react'
 
 const MessageReactionSheet = () => {
   const handleSelect = useCallback((native: string) => {
-    const chat = useChatStore.getState()
-    emojiReaction(chat.emojiPicker.selectedMessage, native)
+    const message = useChatStore.getState().emojiPicker.selectedMessage
+    if (message) emojiReaction(message, native)
     closeMessageReaction()
   }, [])
 

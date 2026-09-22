@@ -21,7 +21,7 @@ function bootstrapE2EChannel(channelId: string, fetchMsgsFromId?: string | null)
 
   useChatStore
     .getState()
-    .setChatRoom(channelId, 'e2e-doc', [], e2eProfile, fetchMsgsFromId ?? undefined)
+    .setChatRoom(channelId, 'e2e-doc', e2eProfile, fetchMsgsFromId ?? undefined)
   useChatStore.getState().bootstrapChannel(
     channelId,
     {

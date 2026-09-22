@@ -12,7 +12,7 @@ export const ChatroomPanelLayout = ({ children }: Props) => {
     useResizeContainer()
   const headingPath = useChatStore((state) => state.chatRoom.headingPath)
   const headingTitle =
-    headingPath.length > 0 ? String(headingPath[headingPath.length - 1]?.text ?? '') : ''
+    headingPath.length > 0 ? (headingPath[headingPath.length - 1]?.text ?? '') : ''
 
   return (
     // Opacity-only entry on the panel (composer transform ban). Overshoot and

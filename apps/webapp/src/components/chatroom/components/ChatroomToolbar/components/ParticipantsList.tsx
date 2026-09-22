@@ -10,11 +10,11 @@ type Props = {
 }
 
 export const ParticipantsList = ({ className }: Props) => {
-  const { isFeedReady } = useChatroomContext()
+  const { error, isFeedReady } = useChatroomContext()
   const headingId = useChatStore((state) => state.chatRoom?.headingId ?? '')
   const presentUsers = usePresentUsers(headingId)
 
-  if (!isFeedReady) {
+  if (!isFeedReady && !error) {
     return (
       <div className={twMerge('flex items-center', className)} aria-hidden>
         <AvatarStackLoader size="sm" repeat={2} />

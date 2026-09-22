@@ -4,12 +4,7 @@ import { twMerge } from 'tailwind-merge'
 
 import MsgComposer from '../MessageComposer/MessageComposer'
 import { ChatroomComposerSkeleton } from '../skeleton'
-import {
-  JoinBroadcastChannel,
-  JoinDirectChannel,
-  JoinGroupChannel,
-  SignInToJoinChannel
-} from './components'
+import { JoinBroadcastChannel, JoinDirectChannel, JoinGroupChannel } from './components'
 
 export interface ChannelComposerProps {
   children?: React.ReactNode
@@ -21,13 +16,13 @@ const ChannelComposerWrapper = ({ children, className }: ChannelComposerProps) =
 )
 
 const AccessControl = () => {
-  const { channelId, isFeedReady, variant } = useChatroomContext()
+  const { channelId, error, isFeedReady, variant } = useChatroomContext()
   const user = useAuthStore((state) => state.profile)
   const channelSettings = useChatStore(
     (state) => state.workspaceSettings.channels.get(channelId) ?? null
   )
 
-  if (!channelId) return null
+  if (!channelId || error) return null
 
   if (!isFeedReady) {
     return <ChatroomComposerSkeleton variant={variant} />
@@ -40,11 +35,11 @@ const AccessControl = () => {
 
   switch (channelInfo.type) {
     case 'DIRECT':
-      return isUserChannelMember ? <MsgComposer.ComposerLayout /> : <ChannelComposer.JoinDirect />
+      return isUserChannelMember ? <MsgComposer.ComposerLayout /> : <JoinDirectChannel />
 
     case 'BROADCAST':
       if (isUserChannelOwner || isUserChannelAdmin) return <MsgComposer.ComposerLayout />
-      return isUserChannelMember ? <ChannelComposer.JoinBroadcast /> : <ChannelComposer.JoinGroup />
+      return isUserChannelMember ? <JoinBroadcastChannel /> : <JoinGroupChannel />
 
     case 'ARCHIVE':
       return null
@@ -52,7 +47,7 @@ const AccessControl = () => {
     case 'GROUP':
     case 'PUBLIC':
     default:
-      return isUserChannelMember ? <MsgComposer.ComposerLayout /> : <ChannelComposer.JoinGroup />
+      return isUserChannelMember ? <MsgComposer.ComposerLayout /> : <JoinGroupChannel />
   }
 }
 
@@ -63,10 +58,3 @@ const ChannelComposer = ({ children, className }: ChannelComposerProps) => (
 )
 
 export default ChannelComposer
-
-ChannelComposer.SignInPrompt = SignInToJoinChannel
-ChannelComposer.JoinDirect = JoinDirectChannel
-ChannelComposer.JoinGroup = JoinGroupChannel
-ChannelComposer.JoinBroadcast = JoinBroadcastChannel
-ChannelComposer.MsgComposer = MsgComposer
-ChannelComposer.AccessControl = AccessControl

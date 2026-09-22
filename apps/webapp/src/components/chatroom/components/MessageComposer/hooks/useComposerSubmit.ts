@@ -15,7 +15,12 @@ import {
 } from '@components/chatroom/utils/outboundMessagePipeline'
 import { showNotificationPrompt } from '@components/NotificationPromptCard'
 import * as toast from '@components/toast'
-import { discardComposerDraft } from '@db/messageComposerDB'
+import {
+  discardComposerDraft,
+  flushPendingWrites,
+  getComposerState,
+  setComposerState
+} from '@db/messageComposerDB'
 import { useApi } from '@hooks/useApi'
 import { useChatStore } from '@stores'
 import type { Editor } from '@tiptap/react'
@@ -91,18 +96,10 @@ export const useComposerSubmit = ({
     return composerSendGate({
       text: editor.getText(),
       readyAttachmentCount: getReadyAttachments().length,
-      editMessageMemory,
       isUploading: isUploadingAttachments,
       hasUploadErrors
     })
-  }, [
-    user,
-    editor,
-    isUploadingAttachments,
-    hasUploadErrors,
-    getReadyAttachments,
-    editMessageMemory
-  ])
+  }, [user, editor, isUploadingAttachments, hasUploadErrors, getReadyAttachments])
 
   const cleanupAfterSubmit = useCallback(() => {
     if (replyMessageMemory) setReplyMsgMemory(channelId, null)
@@ -164,9 +161,21 @@ export const useComposerSubmit = ({
         return
       }
 
+      const clearEarly = prepared.shouldClearComposerEarly
+      // The early clear deletes the saved draft, so a failed comment writes it back for a cancel.
+      let savedDraftRead: ReturnType<typeof getComposerState> | null = null
+      if (clearEarly && prepared.mode.kind === 'comment' && workspaceId) {
+        // A keystroke from just before the comment began may still sit in the debounce.
+        flushPendingWrites()
+        savedDraftRead = getComposerState(workspaceId, channelId)
+      }
+
       // The composer clears only after the probe, so a second press here would send a second copy.
       probingRef.current = true
-      const storageReady = await ensureOutboundStorageReady(prepared).finally(() => {
+      const [storageReady, savedDraft] = await Promise.all([
+        ensureOutboundStorageReady(prepared),
+        savedDraftRead
+      ]).finally(() => {
         probingRef.current = false
       })
       if (!storageReady) {
@@ -185,7 +194,6 @@ export const useComposerSubmit = ({
         })
       }
 
-      const clearEarly = prepared.shouldClearComposerEarly
       const unsentHtml = clearEarly ? editor.getHTML() : ''
       // The early clear ends comment mode, which empties the record of the files the comment added.
       // A restored comment records them again, so a later cancel still deletes their uploads.
@@ -225,6 +233,7 @@ export const useComposerSubmit = ({
             setCommentMsgMemory(channelId, prepared.mode.commentMemory)
             editor.commands.setContent(unsentHtml)
             for (const id of unsentModeAddedIds) pushModeAddedId(draftKey, id)
+            if (savedDraft && workspaceId) void setComposerState(workspaceId, channelId, savedDraft)
           }
         }
         toast.Error(error instanceof Error ? error.message : 'Failed to send')

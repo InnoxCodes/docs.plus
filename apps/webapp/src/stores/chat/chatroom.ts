@@ -1,22 +1,23 @@
 import { sendPresenceBroadcast } from '@services/workspacePresenceSync'
+import type { Editor } from '@tiptap/core'
 import type { ChatPaneMode, Profile } from '@types'
+import type { HeadingAncestor } from '@utils/headingSlugTrail'
 import { immer } from 'zustand/middleware/immer'
 
 import { useAuthStore } from '../authStore'
 import { useStore } from '../useStore'
 
 type TChatRoom = {
-  headingPath: Array<any>
+  headingPath: Pick<HeadingAncestor, 'id' | 'text'>[]
   headingId?: string
   documentId?: string
   /** Read only on mobile. Desktop sizes its docked panel from `panelHeight`. */
   paneMode: ChatPaneMode
   panelHeight: number
-  replyMessageMemory?: any
-  editMessageMemory?: any
   fetchMsgsFromId?: string
-  editorInstance?: any
-  editorRef?: any
+  editorInstance?: Editor
+  /** Only the composer of `headingId` takes it, and only if focus stayed on `focusOrigin`. */
+  composerFocusRequest?: { headingId: string; focusOrigin: Element | null }
 }
 
 interface IChatroomStore {
@@ -24,15 +25,13 @@ interface IChatroomStore {
   setChatRoom: (
     headingId: string,
     documentId: string,
-    headingPath: Array<any>,
     user: Profile | null,
     fetchMsgsFromId?: string
   ) => void
-  updateChatRoom: (key: keyof TChatRoom, value: any) => void
   destroyChatRoom: () => void
   setPaneMode: (mode: ChatPaneMode) => void
   setOrUpdateChatPanelHeight: (height: number) => void
-  setOrUpdateChatRoom: (key: keyof TChatRoom, value: any) => void
+  setOrUpdateChatRoom: <K extends keyof TChatRoom>(key: K, value: TChatRoom[K]) => void
   switchChatRoom: (channelId: string) => void
 }
 
@@ -43,25 +42,15 @@ const chatRoom = immer<IChatroomStore>((set, get) => ({
     headingPath: [],
     paneMode: 'closed',
     panelHeight: 410,
-    replyMessageMemory: undefined,
-    editMessageMemory: undefined,
     fetchMsgsFromId: undefined,
-    editorInstance: undefined,
-    editorRef: undefined
+    editorInstance: undefined
   },
 
-  updateChatRoom: (key, value) => {
-    set((state) => {
-      // @ts-ignore
-      state.chatRoom[key] = value
-    })
-  },
-
-  setChatRoom: (headingId, documentId, headingPath, user, fetchMsgsFromId) => {
+  setChatRoom: (headingId, documentId, user, fetchMsgsFromId) => {
     set((state) => {
       state.chatRoom.headingId = headingId
       state.chatRoom.documentId = documentId
-      state.chatRoom.headingPath = headingPath
+      state.chatRoom.headingPath = []
       state.chatRoom.fetchMsgsFromId = fetchMsgsFromId
     })
 
@@ -71,11 +60,9 @@ const chatRoom = immer<IChatroomStore>((set, get) => ({
     }
   },
 
+  // A plain object, not a recipe: immer's Draft type rejects a TipTap Editor.
   setOrUpdateChatRoom: (key, value) => {
-    set((state) => {
-      // @ts-ignore
-      state.chatRoom[key] = value
-    })
+    set({ chatRoom: { ...get().chatRoom, [key]: value } })
   },
 
   setOrUpdateChatPanelHeight: (height) => {
@@ -103,7 +90,7 @@ const chatRoom = immer<IChatroomStore>((set, get) => ({
   },
 
   destroyChatRoom: () => {
-    const state = get() as any
+    const { panelHeight } = get().chatRoom
     const broadcaster = useStore.getState().settings?.broadcaster
 
     set((s) => {
@@ -114,9 +101,8 @@ const chatRoom = immer<IChatroomStore>((set, get) => ({
         // Unlike panelHeight, the mode does not survive: closing unmounts the
         // chat subtree, so there is no geometry left to remember.
         paneMode: 'closed',
-        panelHeight: state.chatRoom.panelHeight,
-        editorInstance: undefined,
-        editorRef: undefined
+        panelHeight,
+        editorInstance: undefined
       }
     })
 

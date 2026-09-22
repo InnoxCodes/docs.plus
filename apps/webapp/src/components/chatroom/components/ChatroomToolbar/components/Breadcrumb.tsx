@@ -18,7 +18,7 @@ type Props = {
 
 export const Breadcrumb = ({ className }: Props) => {
   const { variant } = useChatroomContext()
-  const updateChatRoom = useChatStore((state) => state.updateChatRoom)
+  const setOrUpdateChatRoom = useChatStore((state) => state.setOrUpdateChatRoom)
   const { headingId } = useChatStore((state) => state.chatRoom)
   const [headingPath, setHeadingPath] = useState<HeadingBreadcrumbItem[]>([])
 
@@ -35,9 +35,9 @@ export const Breadcrumb = ({ className }: Props) => {
     const headingAddress = resolveHeadingBreadcrumbs(editor, headingId)
     if (!headingAddress) return
 
-    updateChatRoom('headingPath', headingAddress)
+    setOrUpdateChatRoom('headingPath', headingAddress)
     setHeadingPath(headingAddress)
-  }, [headingId, editor, providerSyncing, loading, workspaceId, updateChatRoom])
+  }, [headingId, editor, providerSyncing, loading, workspaceId, setOrUpdateChatRoom])
 
   const openChatContainerHandler = useCallback(
     (e: React.MouseEvent, heading: HeadingBreadcrumbItem) => {
