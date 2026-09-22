@@ -179,10 +179,15 @@ export const useComposerAttachments = ({ workspaceId, channelId, userId }: Args)
         }
         const id = crypto.randomUUID()
         if (addedInMode) pushModeAddedId(draftKey, id)
+        // The row exists before its upload starts, so a file queued behind others shows and counts.
+        setAttachments(activeKey, (prev) => [
+          ...prev,
+          { id, file, status: 'uploading', progress: 0 }
+        ])
         runner.enqueue(id, file)
       }
     },
-    [activeRunnerRef, channelId, draftKey, pushModeAddedId, userId]
+    [activeKey, activeRunnerRef, channelId, draftKey, pushModeAddedId, setAttachments, userId]
   )
 
   const loadExistingAttachments = useCallback(
