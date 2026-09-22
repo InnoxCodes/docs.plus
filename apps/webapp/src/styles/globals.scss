@@ -736,6 +736,14 @@ html:not(.m_mobile) {
        translate utilities (e.g. PanelTabBar's -translate-y-px). */
     animation: badge-entry 200ms ease-out backwards;
   }
+
+  /* AvatarStack faces carry both classes, and this block would win the `animation` property.
+     badge-entry stays first, so the finished entry does not replay when typing stops. */
+  .animate-badge-entry.avatar-typing {
+    animation:
+      badge-entry 200ms ease-out backwards,
+      avatar-typing 0.8s ease-in-out infinite;
+  }
 }
 
 /* Deep-link / reply-jump highlight — duration matches MESSAGE_HIGHLIGHT_MS / --motion-flash-hold */
