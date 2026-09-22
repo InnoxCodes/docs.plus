@@ -20,8 +20,7 @@ import {
   renderMetadataInto
 } from './previewShared'
 
-/** Shared iOS keyboard dismiss / refocus cadence (clipboard, preview sheet, composer link dialog). */
-export const KEYBOARD_DISMISS_DELAY_MS = 50
+const KEYBOARD_DISMISS_DELAY_MS = 50
 
 /**
  * Exists for edit-mode link taps. iOS releases the keyboard only when the
@@ -161,7 +160,6 @@ const buildDesktopPopover = (
   // in place; no external metadata fetch. Copy still yields the canonical URL.
   const internalLink = classifyInternalDocumentLink(href, window.location.pathname)
   if (internalLink) {
-    popover.classList.add('is-internal')
     popover.append(createInternalLinkChip(internalLink, editor), copyButton, ...editControls)
     return { element: popover, flush: () => {} }
   }

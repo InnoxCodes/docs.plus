@@ -1,10 +1,12 @@
 import { searchWorkspaceUsers } from '@api'
 import { useAuthStore, useStore } from '@stores'
+import type { Editor } from '@tiptap/core'
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 
 import { MentionSuggestions } from './MentionSuggestions'
 import {
   EVERYONE_ENTRY,
+  mentionOptionId,
   type MentionPickerEntry,
   type MentionPickerUser,
   showEveryoneForQuery
@@ -13,6 +15,7 @@ import {
 const DEBOUNCE_MS = 150
 
 export type MentionListProps = {
+  editor: Editor
   query: string
   command: (item: { id: string; label: string }) => void
 }
@@ -22,7 +25,7 @@ export type MentionListRef = {
 }
 
 const MentionList = forwardRef<MentionListRef, MentionListProps>(function MentionList(
-  { query, command },
+  { editor, query, command },
   ref
 ) {
   const [selectedIndex, setSelectedIndex] = useState(0)
@@ -114,6 +117,16 @@ const MentionList = forwardRef<MentionListRef, MentionListProps>(function Mentio
     const el = listRef.current?.querySelector(`[data-mention-option-id="${CSS.escape(entry.id)}"]`)
     el?.scrollIntoView({ block: 'nearest' })
   }, [selectedIndex, flatEntries])
+
+  const activeOptionId = flatEntries.length > 0 ? mentionOptionId(selectedIndex) : undefined
+
+  // Focus stays in the editor, so the highlight is announced from there. No cleanup:
+  // a late unmount could strip the next picker's value. destroyPopup() clears it.
+  useEffect(() => {
+    const dom = editor.view.dom
+    if (activeOptionId) dom.setAttribute('aria-activedescendant', activeOptionId)
+    else dom.removeAttribute('aria-activedescendant')
+  }, [editor, activeOptionId])
 
   const selectItem = (index: number) => {
     const item = flatEntries[index]

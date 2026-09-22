@@ -2,7 +2,7 @@ import { EmojiPanel } from '@components/chatroom/components/EmojiPanel'
 import { useChatStore } from '@stores'
 import { PANEL_TWEEN } from '@utils/motion'
 import { AnimatePresence, motion, type PanInfo } from 'motion/react'
-import { type RefObject, useCallback, useEffect, useRef, useState } from 'react'
+import { type KeyboardEvent, type RefObject, useCallback, useEffect, useRef, useState } from 'react'
 
 import { useComposerEmojiPanelStore } from '../../stores/composerEmojiPanelStore'
 
@@ -77,6 +77,13 @@ export const ComposerEmojiPanel = () => {
     else state.collapse()
   }
 
+  // A div with role="button" gets no click from the keyboard, so Enter and Space act as a tap.
+  const handleHandleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return
+    event.preventDefault()
+    handleHandleClick()
+  }
+
   const handleSelect = useCallback((native: string) => {
     const editor = useChatStore.getState().chatRoom.editorInstance
     editor?.chain().insertContent(native).run()
@@ -106,6 +113,7 @@ export const ComposerEmojiPanel = () => {
               className="flex w-full shrink-0 items-center justify-center"
               onPanEnd={handlePanEnd}
               onClick={handleHandleClick}
+              onKeyDown={handleHandleKeyDown}
               role="button"
               tabIndex={0}
               aria-label="Resize emoji panel"

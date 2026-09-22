@@ -18,9 +18,7 @@ type Props = React.ComponentProps<typeof Button> & {
 }
 
 function getCaretRect(editor: Editor): DOMRect {
-  const coords = editor.view.coordsAtPos(editor.state.selection.from)
-  const left = coords.left + window.scrollX
-  const top = coords.top + window.scrollY
+  const { left, top } = editor.view.coordsAtPos(editor.state.selection.from)
   return { left, top, x: left, y: top } as DOMRect
 }
 

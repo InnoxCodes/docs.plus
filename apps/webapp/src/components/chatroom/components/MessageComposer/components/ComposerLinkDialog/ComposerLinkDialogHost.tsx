@@ -24,6 +24,7 @@ export function ComposerLinkDialogHost() {
         cancel: s.cancel
       }))
     )
+  const form = phase === 'create' ? create : phase === 'edit' ? edit : null
   const headingId = useChatStore((s) => s.chatRoom.headingId)
   const isChatroomOpen = useChatStore((s) => s.chatRoom.paneMode !== 'closed')
 
@@ -55,23 +56,12 @@ export function ComposerLinkDialogHost() {
           onEdit={openEditFromPreview}
         />
       )}
-      {phase === 'create' && create && (
+      {form && (
         <ComposerLinkEditorDialog
-          key="create"
-          initialHref={create.initialHref}
-          initialText={create.initialText}
-          validate={create.validate}
-          onSave={save}
-          onCancel={cancel}
-        />
-      )}
-      {phase === 'edit' && edit && (
-        <ComposerLinkEditorDialog
-          key="edit"
-          initialHref={edit.initialHref}
-          initialText={edit.initialText}
-          cameFromPreview={Boolean(edit.returnToPreview)}
-          validate={edit.validate}
+          key={phase}
+          initialHref={form.initialHref}
+          initialText={form.initialText}
+          validate={form.validate}
           onSave={save}
           onCancel={cancel}
         />

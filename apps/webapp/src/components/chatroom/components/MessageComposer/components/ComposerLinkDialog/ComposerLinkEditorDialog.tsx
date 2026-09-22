@@ -1,17 +1,13 @@
 import { HyperlinkUrlTextarea } from '@components/TipTap/hyperlinkPopovers/components/HyperlinkUrlTextarea'
-import { KEYBOARD_DISMISS_DELAY_MS } from '@components/TipTap/hyperlinkPopovers/previewHyperlink'
 import type { HyperlinkResult } from '@components/TipTap/hyperlinkPopovers/types'
 import { normalizeHref, validateURL } from '@docs.plus/extension-hyperlink'
 import { type FormEvent, useId, useLayoutEffect, useRef, useState } from 'react'
 
-import { useComposerLinkDialogStore } from '../../stores/composerLinkDialogStore'
 import { ComposerLinkModalShell } from './ComposerLinkModalShell'
 
 type Props = {
   initialHref: string
   initialText: string
-  /** True when this edit was opened from preview (href focus may defer). */
-  cameFromPreview?: boolean
   validate?: (url: string) => boolean
   onSave: (result: HyperlinkResult) => boolean
   onCancel: () => void
@@ -20,7 +16,6 @@ type Props = {
 export function ComposerLinkEditorDialog({
   initialHref,
   initialText,
-  cameFromPreview = false,
   validate,
   onSave,
   onCancel
@@ -36,17 +31,11 @@ export function ComposerLinkEditorDialog({
     if (showError) setShowError(false)
   }
 
+  // Synchronous, inside the opening tap: iOS shows the keyboard only for a
+  // focus call made during a user gesture, never from a timer.
   useLayoutEffect(() => {
-    const focusHref = () => hrefRef.current?.focus()
-    const deferFocus =
-      cameFromPreview && !useComposerLinkDialogStore.getState().keyboardWasOpenAtOpen
-    if (!deferFocus) {
-      focusHref()
-      return
-    }
-    const id = window.setTimeout(focusHref, KEYBOARD_DISMISS_DELAY_MS)
-    return () => window.clearTimeout(id)
-  }, [cameFromPreview])
+    hrefRef.current?.focus()
+  }, [])
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault()

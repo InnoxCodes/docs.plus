@@ -3,7 +3,7 @@ import { applyEdit } from '@components/TipTap/hyperlinkPopovers/commands/applyEd
 import { removeHyperlinkAtPos } from '@components/TipTap/hyperlinkPopovers/commands/removeHyperlinkAtPos'
 import { getHyperlinkDisplayText } from '@components/TipTap/hyperlinkPopovers/linkMarkUtils'
 import type { HyperlinkResult } from '@components/TipTap/hyperlinkPopovers/types'
-import { useChatStore, useStore } from '@stores'
+import { useStore } from '@stores'
 import type { Editor } from '@tiptap/core'
 import { create } from 'zustand'
 
@@ -21,13 +21,6 @@ export type { ComposerLinkPhase } from '../types'
 /** Escape / Enter guards — same pattern as `isMentionSuggestionPopupVisible`. */
 export const isComposerLinkDialogOpen = (): boolean =>
   useComposerLinkDialogStore.getState().phase !== 'idle'
-
-/** Close other composer overlays before opening link dialog. Symmetric closure
- *  with the emoji panel; `composerEmojiPanelStore.open()` mirrors this in the
- *  opposite direction. */
-const dismissOtherComposerOverlays = () => {
-  dismissComposerEmojiAndMentionOverlays(useChatStore.getState().chatRoom.editorInstance)
-}
 
 type HistoryState = { composerLinkDialog: true }
 
@@ -61,19 +54,10 @@ type LinkDialogOpenPayload = {
 
 /** Hardware/gesture back while the dialog is open. Edit-from-preview re-traps history. */
 export const handleComposerLinkDialogPopState = (): void => {
-  const state = useComposerLinkDialogStore.getState()
-  if (state.phase === 'idle') return
-  if (state.phase === 'edit' && state.edit?.returnToPreview) {
-    useComposerLinkDialogStore.setState({
-      phase: 'preview',
-      preview: state.edit.returnToPreview,
-      edit: null,
-      create: null
-    })
-    restoreHistoryTrap()
-    return
-  }
-  state.close({ refocus: state.keyboardWasOpenAtOpen })
+  const { phase, edit, cancel } = useComposerLinkDialogStore.getState()
+  if (phase === 'idle') return
+  cancel()
+  if (edit?.returnToPreview) restoreHistoryTrap()
 }
 
 export const useComposerLinkDialogStore = create<{
@@ -96,7 +80,7 @@ export const useComposerLinkDialogStore = create<{
     phase: Exclude<ComposerLinkPhase, 'idle'>,
     payload: LinkDialogOpenPayload
   ) => {
-    dismissOtherComposerOverlays()
+    dismissComposerEmojiAndMentionOverlays()
     pushIfIdle(get().phase)
     set({
       phase,
@@ -179,12 +163,15 @@ export const useComposerLinkDialogStore = create<{
     },
 
     cancel: () => {
-      const { phase, edit } = get()
+      const { phase, edit, keyboardWasOpenAtOpen } = get()
       if (phase === 'edit' && edit?.returnToPreview) {
+        // Unmounting the focused URL field closes an open keyboard, so focus moves to
+        // the composer in the same tap. The shell's focus trap lets it stay there.
+        if (keyboardWasOpenAtOpen) refocus(edit.editor)
         set({ phase: 'preview', preview: edit.returnToPreview, edit: null, create: null })
         return
       }
-      get().close({ refocus: get().keyboardWasOpenAtOpen })
+      get().close({ refocus: keyboardWasOpenAtOpen })
     },
 
     close: (opts) => {

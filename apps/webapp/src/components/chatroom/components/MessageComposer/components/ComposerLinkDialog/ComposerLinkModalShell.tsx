@@ -1,12 +1,14 @@
 import { modalBackdropClassName, modalPanelFrameClassName } from '@components/ui/Dialog'
+import { MOTION_DIALOG_IN_MS, MOTION_DIALOG_OUT_MS } from '@utils/motion'
 import { syncVisualViewportToCssVars } from '@utils/visualViewportCss'
-import { motion } from 'motion/react'
+import { motion, useIsPresent } from 'motion/react'
 import { type ReactNode, useLayoutEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 
-// 0.18/0.15s in lockstep with MOTION_DIALOG_IN_MS/MOTION_DIALOG_OUT_MS in @utils/motion.
-const BACKDROP_TRANSITION = { duration: 0.15, ease: 'easeOut' } as const
-const CARD_TRANSITION = { duration: 0.18, ease: 'easeOut' } as const
+// Same timing as the house Dialog in ui/Dialog.tsx: ease-out on enter, ease-in on exit.
+const BACKDROP_TRANSITION = { duration: MOTION_DIALOG_OUT_MS / 1000, ease: 'easeOut' } as const
+const CARD_TRANSITION = { duration: MOTION_DIALOG_IN_MS / 1000, ease: 'easeOut' } as const
+const EXIT_TRANSITION = { duration: MOTION_DIALOG_OUT_MS / 1000, ease: 'easeIn' } as const
 
 type Props = {
   children: ReactNode
@@ -16,6 +18,7 @@ type Props = {
 
 export function ComposerLinkModalShell({ children, titleId, onBackdropClick }: Props) {
   const cardRef = useRef<HTMLDivElement>(null)
+  const isPresent = useIsPresent()
 
   useLayoutEffect(() => {
     syncVisualViewportToCssVars()
@@ -30,11 +33,12 @@ export function ComposerLinkModalShell({ children, titleId, onBackdropClick }: P
     }
   }, [])
 
-  // Tab/Shift+Tab wrap inside the card. Initial focus is owned by each dialog
-  // so iOS-specific cadence (e.g. edit-from-preview 50ms defer) isn't overridden.
+  // Focus that returns to the composer editor is how a dialog hands the keyboard back,
+  // so the trap lets it stay. An exiting shell drops its trap: AnimatePresence
+  // keeps it mounted beside the next dialog during the exit tween.
   useLayoutEffect(() => {
     const card = cardRef.current
-    if (!card) return
+    if (!card || !isPresent) return
     const focusables = () =>
       Array.from(
         card.querySelectorAll<HTMLElement>(
@@ -44,7 +48,8 @@ export function ComposerLinkModalShell({ children, titleId, onBackdropClick }: P
 
     const onFocusIn = (event: FocusEvent) => {
       const target = event.target
-      if (!(target instanceof Node) || card.contains(target)) return
+      if (!(target instanceof Element) || card.contains(target)) return
+      if (target.closest('[data-chat-composer-surface] .ProseMirror')) return
       const items = focusables()
       items[0]?.focus()
     }
@@ -70,7 +75,7 @@ export function ComposerLinkModalShell({ children, titleId, onBackdropClick }: P
       card.removeEventListener('keydown', onKey)
       document.removeEventListener('focusin', onFocusIn, true)
     }
-  }, [])
+  }, [isPresent])
 
   if (typeof document === 'undefined') return null
 
@@ -89,7 +94,7 @@ export function ComposerLinkModalShell({ children, titleId, onBackdropClick }: P
         onClick={onBackdropClick}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
+        exit={{ opacity: 0, transition: EXIT_TRANSITION }}
         transition={BACKDROP_TRANSITION}
       />
       <div className="pointer-events-none grid h-full min-h-0 place-items-center p-4">
@@ -101,7 +106,7 @@ export function ComposerLinkModalShell({ children, titleId, onBackdropClick }: P
           className={`${modalPanelFrameClassName} text-base-content pointer-events-auto relative w-full max-w-sm shrink-0 p-4`}
           initial={{ opacity: 0, scale: 0.96 }}
           animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.96 }}
+          exit={{ opacity: 0, scale: 0.96, transition: EXIT_TRANSITION }}
           transition={CARD_TRANSITION}>
           {children}
         </motion.div>

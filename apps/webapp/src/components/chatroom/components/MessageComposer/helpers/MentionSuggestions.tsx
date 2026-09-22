@@ -67,8 +67,6 @@ export function MentionSuggestions({
     return { everyoneEntries: everyone, memberEntries: members }
   }, [flatEntries])
 
-  const activeOptionId = flatEntries.length > 0 ? mentionOptionId(selectedIndex) : undefined
-
   const statusText = fetchError
     ? "Couldn't load members"
     : loading
@@ -83,7 +81,6 @@ export function MentionSuggestions({
       id={MENTION_LISTBOX_ID}
       role="listbox"
       aria-label="Mention members"
-      aria-activedescendant={activeOptionId}
       className="max-h-[300px] overflow-y-auto p-1">
       <div role="status" aria-live="polite" className="sr-only">
         {statusText}

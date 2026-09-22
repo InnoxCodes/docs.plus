@@ -1,6 +1,8 @@
 import * as toast from '@components/toast'
 import { useCallback, useRef, useState } from 'react'
 
+import { dismissComposerOverlaysBeforeVoice } from '../helpers/dismissComposerOverlays'
+
 const MAX_RECORD_MS = 5 * 60 * 1000
 const CANCEL_THRESHOLD_PX = 80
 const LOCK_THRESHOLD_PX = 80
@@ -179,6 +181,7 @@ export function useVoiceRecorder({
         return
       }
 
+      dismissComposerOverlaysBeforeVoice()
       anchorRef.current = { x: clientX, y: clientY }
       resetGesture()
       const startId = ++startIdRef.current

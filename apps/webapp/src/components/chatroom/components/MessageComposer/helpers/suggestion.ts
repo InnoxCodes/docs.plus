@@ -12,7 +12,7 @@ import { MOTION_OVERLAY_IN_MS, prefersReducedMotion } from '@utils/motion'
 
 import { dismissComposerOverlaysBeforeMention } from './dismissComposerOverlays'
 import MentionList, { type MentionListRef } from './MentionList'
-import { setMentionPopupOpen, syncMentionPickerActive } from './mentionTypes'
+import { MENTION_LISTBOX_ID, setMentionPopupOpen, syncMentionPickerActive } from './mentionTypes'
 
 type MentionSuggestionRenderProps = {
   editor: Editor
@@ -41,6 +41,7 @@ export default {
     let popup: HTMLDivElement | null = null
     let cleanup: (() => void) | null = null
     let surface: HTMLElement | null = null
+    let editorDom: HTMLElement | null = null
 
     const destroyPopup = () => {
       setMentionPopupOpen(false)
@@ -51,6 +52,10 @@ export default {
       component?.destroy()
       component = null
       surface = null
+      // Written on the element directly: editorProps.attributes would drop Tiptap's role="textbox".
+      editorDom?.removeAttribute('aria-controls')
+      editorDom?.removeAttribute('aria-activedescendant')
+      editorDom = null
     }
 
     return {
@@ -78,6 +83,8 @@ export default {
         popup.style.opacity = '0'
         popup.appendChild(component.element)
         document.body.appendChild(popup)
+        editorDom = props.editor.view.dom
+        editorDom.setAttribute('aria-controls', MENTION_LISTBOX_ID)
         setMentionPopupOpen(true)
 
         const virtualElement = {

@@ -6,7 +6,6 @@ import {
   PopoverTrigger
 } from '@components/ui/Popover'
 import { Icons } from '@icons'
-import { useCallback } from 'react'
 import { twMerge } from 'tailwind-merge'
 
 import { useComposerAttachInput } from '../../../hooks/useComposerAttachInput'
@@ -19,7 +18,7 @@ type Props = {
   className?: string
 }
 
-type MenuRowsProps = {
+type InsertMenuRowsProps = {
   atLimit: boolean
   showFormattingToolbar: boolean
   showVoiceEntry?: boolean
@@ -37,25 +36,17 @@ function InsertMenuRows({
   onFormat,
   onVoice,
   rowClassName
-}: MenuRowsProps) {
+}: InsertMenuRowsProps) {
   const formatLabel = showFormattingToolbar ? 'Hide formatting' : 'Text formatting'
 
   return (
     <>
-      <PopoverClose
-        type="button"
-        role="menuitem"
-        className={rowClassName}
-        disabled={atLimit}
-        onClick={onAttach}>
+      <PopoverClose className={rowClassName} disabled={atLimit} onClick={onAttach}>
         <Icons.upload size={18} className="text-base-content/80 shrink-0 stroke-[1.75]" />
         Attach file
       </PopoverClose>
       <PopoverClose
-        type="button"
-        role="menuitem"
         className={twMerge(rowClassName, showFormattingToolbar && 'text-primary')}
-        aria-pressed={showFormattingToolbar}
         onClick={onFormat}>
         <Icons.textFormat
           size={18}
@@ -67,7 +58,7 @@ function InsertMenuRows({
         {formatLabel}
       </PopoverClose>
       {showVoiceEntry ? (
-        <PopoverClose type="button" role="menuitem" className={rowClassName} onClick={onVoice}>
+        <PopoverClose className={rowClassName} onClick={onVoice}>
           <Icons.mic size={18} className="text-base-content/80 shrink-0 stroke-[1.75]" />
           Record voice
         </PopoverClose>
@@ -101,10 +92,6 @@ export function ComposerInsertMenu({ showVoiceEntry, onVoiceFromMenu, className 
   const { isMobile, showFormattingToolbar, toggleToolbar } = useMessageComposer()
   const attach = useComposerAttachInput()
 
-  const onFormat = useCallback(() => {
-    toggleToolbar()
-  }, [toggleToolbar])
-
   const rowClassName = isMobile
     ? 'hover:bg-base-200 flex w-full min-h-11 items-center gap-3 rounded-field px-3 py-2.5 text-left text-sm disabled:opacity-40'
     : 'hover:bg-base-200 flex w-full items-center gap-2.5 rounded-field px-2.5 py-2 text-left text-sm disabled:opacity-40'
@@ -122,8 +109,7 @@ export function ComposerInsertMenu({ showVoiceEntry, onVoiceFromMenu, className 
               className
             )}
             data-testid="composer-insert-trigger"
-            aria-label="Insert — attach, format, and more"
-            aria-haspopup="menu">
+            aria-label="Insert — attach, format, and more">
             <Icons.plus
               size={isMobile ? 20 : 18}
               className="pointer-events-none shrink-0 stroke-[1.75]"
@@ -132,13 +118,13 @@ export function ComposerInsertMenu({ showVoiceEntry, onVoiceFromMenu, className 
         </PopoverTrigger>
         <PopoverContent
           className={twMerge(popoverPanelClassName, isMobile ? 'w-52 p-1.5' : 'w-48 p-1')}
-          role="menu">
+          aria-label="Insert">
           <InsertMenuRows
             atLimit={attach.atLimit}
             showFormattingToolbar={showFormattingToolbar}
             showVoiceEntry={showVoiceEntry}
             onAttach={attach.openFilePicker}
-            onFormat={onFormat}
+            onFormat={toggleToolbar}
             onVoice={() => onVoiceFromMenu?.()}
             rowClassName={rowClassName}
           />

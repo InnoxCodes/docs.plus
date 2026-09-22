@@ -70,7 +70,7 @@ type Props = {
 }
 export const Picker = ({ emojiSelectHandler }: Props) => {
   const { variant } = useEmojiPanelContext()
-  const { emojiPicker } = useChatStore()
+  const isOpen = useChatStore((s) => s.emojiPicker.isOpen)
   const resolvedTheme = useThemeStore((s) => s.resolvedTheme)
   const isDark = !isLightTheme(resolvedTheme)
   const wrapperRef = useRef<HTMLDivElement>(null)
@@ -96,7 +96,7 @@ export const Picker = ({ emojiSelectHandler }: Props) => {
         onClickOutside={() => {
           // Closes the reaction sheet too. Closing only the picker left the sheet
           // open with no message selected, so the next tap wrote no reaction.
-          if (emojiPicker.isOpen) closeMessageReaction()
+          if (isOpen) closeMessageReaction()
         }}
         onEmojiSelect={emojiSelectHandler}
       />

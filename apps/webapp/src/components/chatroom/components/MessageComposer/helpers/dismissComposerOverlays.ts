@@ -1,6 +1,5 @@
 import { closeMessageReaction } from '@components/chatroom/utils/messageReaction'
 import { useChatStore } from '@stores'
-import type { Editor } from '@tiptap/core'
 
 import type { EmojiPickerEventType } from '../../../../../stores/chat/emojiPickerStore'
 import { useComposerEmojiPanelStore } from '../stores/composerEmojiPanelStore'
@@ -29,12 +28,18 @@ export function dismissComposerEmojiOverlays(): void {
 }
 
 export function dismissComposerOverlaysBeforeMention(): void {
-  stopComposerVoiceRecording()
   dismissComposerEmojiOverlays()
   useComposerLinkDialogStore.getState().close()
 }
 
-export function dismissComposerEmojiAndMentionOverlays(editor?: Editor | null): void {
-  dismissComposerEmojiOverlays()
-  dismissComposerMentionSuggestion(editor ?? useChatStore.getState().chatRoom.editorInstance)
+/** No voice stop: it would end the recording that is starting. */
+export function dismissComposerOverlaysBeforeVoice(): void {
+  useComposerEmojiPanelStore.getState().close()
+  closeMessageReaction()
+  dismissComposerMentionSuggestion(useChatStore.getState().chatRoom.editorInstance)
+}
+
+export function dismissComposerEmojiAndMentionOverlays(): void {
+  stopComposerVoiceRecording()
+  dismissComposerOverlaysBeforeVoice()
 }
