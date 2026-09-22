@@ -14,6 +14,25 @@ import { Highlight as BaseHighlight } from '@tiptap/extension-highlight'
  * package source — it belongs here with the extension, not in a shared markdown file.
  */
 export const Highlight = BaseHighlight.extend({
+  // The server stores `color`. Upstream adds it only with multicolor on.
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      color: {
+        default: null,
+        parseHTML: (element: HTMLElement) =>
+          element.getAttribute('data-color') || element.style.backgroundColor || null,
+        renderHTML: (attributes: { color?: string | null }) => {
+          if (!attributes.color) return {}
+          return {
+            'data-color': attributes.color,
+            style: `background-color: ${attributes.color}`
+          }
+        }
+      }
+    }
+  },
+
   markdownTokenName: 'highlight',
 
   markdownTokenizer: {
