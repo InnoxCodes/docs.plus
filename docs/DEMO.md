@@ -139,7 +139,7 @@ Type `@`, then pick a name, to tell that person about the message. `@everyone` t
 
 The alert reads the plain message text, so **the whole name has to match**. `@harvey` does not reach `harvey_marzban`, and `@everyone_team` does not fire `@everyone`.
 
-A mention in a message is coloured and tappable. Tap it for that person's profile card — try it here.
+A mention in a message is coloured and tappable. Tap it for that person's profile card — try it here. On your own empty card, Add bio and links opens Settings on Profile.
 
 ![A mention that matches, and one that does not](/demo-assets/d15-mention.png)
 _The whole name, or no alert._

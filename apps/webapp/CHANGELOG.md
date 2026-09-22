@@ -18,6 +18,9 @@ plus the house order in [`RELEASE_POLICY.md`](../../RELEASE_POLICY.md).
 
 ### Added
 
+- Your own empty profile card keeps one row: "No bio or links yet." and
+  Add bio and links. The button opens Settings on Profile.
+
 - History paints the latest Pad title rename above the editor. Chat paints
   the live username, then the snapshot name if the users join is missing.
   A Documents-list rename of the open pad writes the header and relays the

@@ -1,7 +1,8 @@
 import { getUserProfileForModal } from '@api'
 import { Avatar } from '@components/ui/Avatar'
+import Button from '@components/ui/Button'
 import { useAsyncRequest } from '@hooks/useAsyncRequest'
-import { useStore } from '@stores'
+import { useAuthStore, useStore } from '@stores'
 import type { PostgrestError } from '@supabase/supabase-js'
 import { useEffect, useMemo } from 'react'
 
@@ -25,6 +26,7 @@ const sectionLabelClass =
 
 export const UserProfileDialog = ({ userId }: UserProfileDialogProps) => {
   const closeDialog = useStore((state) => state.closeDialog)
+  const viewerId = useAuthStore((state) => state.profile?.id)
   const {
     data: userData,
     loading,
@@ -103,6 +105,25 @@ export const UserProfileDialog = ({ userId }: UserProfileDialogProps) => {
   const bio = isNonEmptyString(userData.profile_data?.bio)
     ? userData.profile_data.bio.trim()
     : undefined
+  const isOwnProfile = viewerId != null && viewerId === (userData.id || userId)
+
+  const emptyProfile = isOwnProfile ? (
+    <div className="flex items-center gap-3 px-4 py-4 sm:px-6 sm:py-5">
+      <p className="text-base-content/60 min-w-0 flex-1 text-sm">No bio or links yet.</p>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="text-primary hover:bg-primary/10 shrink-0"
+        onClick={() => {
+          closeDialog()
+          window.location.hash = '#settings?tab=profile'
+        }}>
+        Add bio and links
+      </Button>
+    </div>
+  ) : (
+    <p className="text-base-content/50 p-4 text-sm sm:p-6">No bio or links yet.</p>
+  )
 
   return (
     <ProfileDialogShell
@@ -144,7 +165,7 @@ export const UserProfileDialog = ({ userId }: UserProfileDialogProps) => {
           ) : null}
         </div>
       ) : (
-        <p className="text-base-content/50 p-4 text-sm sm:p-6">No bio or links yet.</p>
+        emptyProfile
       )}
     </ProfileDialogShell>
   )
