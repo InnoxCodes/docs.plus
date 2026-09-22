@@ -7,9 +7,10 @@ import { useCallback, useEffect, useRef } from 'react'
 import { twMerge } from 'tailwind-merge'
 
 import { registerComposerVoiceStop } from '../../helpers/composerVoiceRecording'
-import { useComposerAttachmentActions, useComposerAttachmentList } from '../../hooks'
+import { useComposerAttachmentList } from '../../hooks'
 import { useComposerFileDrop } from '../../hooks/useComposerFileDrop'
 import { useMessageComposer } from '../../hooks/useMessageComposer'
+import { useSendVoiceWhenReady } from '../../hooks/useSendVoiceWhenReady'
 import { useVoiceRecorder } from '../../hooks/useVoiceRecorder'
 import MsgComposer from '../../MessageComposer'
 import { ComposerInsertMenu } from '../Actions/ActionButtons/ComposerInsertMenu'
@@ -32,20 +33,20 @@ export function ComposerBar({ variant, className }: Props) {
   const { canSend } = useMessageComposer()
   const user = useAuthStore((state) => state.profile)
   const workspaceId = useStore((state) => state.settings.workspaceId)
-  const { addFiles } = useComposerAttachmentActions()
   const attachments = useComposerAttachmentList(workspaceId, channelId)
   const { dropHandlers, dropSurfaceClassName } = useComposerFileDrop()
+  const sendVoiceNote = useSendVoiceWhenReady(attachments)
 
   const voice = useVoiceRecorder({
-    onAttach: (file) => addFiles([file]),
+    onSend: sendVoiceNote,
     attachmentCount: attachments.length,
     maxAttachments: CHAT_MEDIA_MAX_ATTACHMENTS,
     onAuthRequired: () => openComposerSignIn(channelId),
     userId: user?.id
   })
 
-  const stopVoiceRef = useRef(voice.stopAndCleanup)
-  stopVoiceRef.current = voice.stopAndCleanup
+  const stopVoiceRef = useRef(voice.discard)
+  stopVoiceRef.current = voice.discard
 
   useEffect(() => {
     registerComposerVoiceStop(() => stopVoiceRef.current())
@@ -60,14 +61,18 @@ export function ComposerBar({ variant, className }: Props) {
     void voice.startLockedFromMenu()
   }, [voice])
 
-  const rowDimmed = voice.phase === 'recording' && !voice.isLocked
+  // The held mic stays at full strength, so the dim skips it.
+  const dim = voice.isHolding && 'opacity-55'
 
   return (
     <div
+      ref={voice.dragSurfaceRef}
       data-chat-composer-surface
       {...dropHandlers}
       className={twMerge(
-        'composer-bar flex flex-col overflow-hidden',
+        // A hold lets the lock pill rise over the feed; overlays that need the clip are closed then.
+        'composer-bar flex flex-col',
+        voice.isHolding ? 'overflow-visible' : 'overflow-hidden',
         isDesktop
           ? 'border-base-300 bg-base-200 rounded-field mb-2 border'
           : 'composer-bar--mobile border-base-300 bg-base-200 border-t',
@@ -83,14 +88,13 @@ export function ComposerBar({ variant, className }: Props) {
       <VoiceRecordingBar
         phase={voice.phase}
         elapsedLabel={voice.elapsedLabel}
-        waveformLevels={voice.waveformLevels}
+        liveLevels={voice.liveLevels}
         isCancelArmed={voice.isCancelArmed}
         isLocked={voice.isLocked}
         previewUrl={voice.previewUrl}
-        cancelRecording={voice.cancelRecording}
+        discard={voice.discard}
         stopRecording={voice.stopRecording}
-        confirmAttach={voice.confirmAttach}
-        discardPreview={voice.discardPreview}
+        sendPreview={voice.sendPreview}
       />
 
       {isDesktop ? <FormattingToolbar /> : <ComposerFormatPanel />}
@@ -99,16 +103,16 @@ export function ComposerBar({ variant, className }: Props) {
         className={twMerge(
           'composer-bar__input-row flex w-full items-center gap-1',
           isDesktop ? 'gap-1.5 px-3 py-2' : 'min-h-11 gap-1 px-3 py-2',
-          rowDimmed && 'pointer-events-none opacity-55'
+          voice.isHolding && 'pointer-events-none'
         )}>
         <ComposerInsertMenu
-          className="composer-bar__insert-trigger shrink-0"
+          className={twMerge('composer-bar__insert-trigger shrink-0', dim)}
           showVoiceEntry={canSend}
           onVoiceFromMenu={onVoiceFromMenu}
         />
-        <MsgComposer.Input className="min-w-0 flex-1 py-0" />
+        <MsgComposer.Input className={twMerge('min-w-0 flex-1 py-0', dim)} />
         <MsgComposer.Actions className={isMobile ? 'gap-0.5' : undefined}>
-          <MsgComposer.EmojiButton />
+          <MsgComposer.EmojiButton className={dim || undefined} />
           <ComposerPrimaryAction voice={voice} />
         </MsgComposer.Actions>
       </div>

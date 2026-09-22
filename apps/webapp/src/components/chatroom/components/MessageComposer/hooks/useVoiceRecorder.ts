@@ -1,4 +1,4 @@
-import { voiceNoteFileName } from '@components/chatroom/utils/chatAudio'
+import { formatAudioClock, voiceNoteFileName } from '@components/chatroom/utils/chatAudio'
 import * as toast from '@components/toast'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
@@ -8,30 +8,36 @@ import { startComposerActivity, stopComposerActivity } from '../helpers/handleTy
 const MAX_RECORD_MS = 5 * 60 * 1000
 const CANCEL_THRESHOLD_PX = 80
 const LOCK_THRESHOLD_PX = 80
-const WAVEFORM_BAR_COUNT = 24
+// Live input bars while recording; the stored note waveform is AUDIO_WAVEFORM_BARS.
+const LIVE_LEVEL_BARS = 24
+const IDLE_LEVELS = Array.from({ length: LIVE_LEVEL_BARS }, () => 0.15)
+// A shorter hold sends nothing and shows the hold hint.
+const MIN_SEND_MS = 1000
+
+const showHoldHint = () =>
+  toast.Info('Hold the mic to record, release to send', { id: 'voice-hold-hint' })
+
+// Android only: iOS Safari has no Vibration API.
+const haptic = () => {
+  if ('vibrate' in navigator) navigator.vibrate(10)
+}
 
 export type VoiceRecorderPhase = 'idle' | 'recording' | 'preview'
 
 export type UseVoiceRecorderOptions = {
-  onAttach: (file: File) => void
+  /** A finished note: a released hold, or Send in the preview. */
+  onSend: (file: File) => void
   attachmentCount: number
   maxAttachments: number
   onAuthRequired: () => void
   userId: string | undefined
 }
 
-const formatElapsed = (ms: number): string => {
-  const totalSeconds = Math.floor(ms / 1000)
-  const minutes = Math.floor(totalSeconds / 60)
-  const seconds = totalSeconds % 60
-  return `${minutes}:${seconds.toString().padStart(2, '0')}`
-}
-
 const stripMime = (mime: string): string =>
   (mime || 'audio/webm').split(';')[0]?.trim() || 'audio/webm'
 
 export function useVoiceRecorder({
-  onAttach,
+  onSend,
   attachmentCount,
   maxAttachments,
   onAuthRequired,
@@ -41,9 +47,7 @@ export function useVoiceRecorder({
   const [elapsedMs, setElapsedMs] = useState(0)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [previewFile, setPreviewFile] = useState<File | null>(null)
-  const [waveformLevels, setWaveformLevels] = useState<number[]>(() =>
-    Array.from({ length: WAVEFORM_BAR_COUNT }, () => 0.15)
-  )
+  const [liveLevels, setLiveLevels] = useState<number[]>(IDLE_LEVELS)
   const [isCancelArmed, setIsCancelArmed] = useState(false)
   const [isLocked, setIsLocked] = useState(false)
 
@@ -63,6 +67,13 @@ export function useVoiceRecorder({
   const startIdRef = useRef(0)
   // A tap, or a permission prompt that takes the touch, ends the hold before the microphone answers.
   const releasedEarlyRef = useRef(false)
+  const startedAtRef = useRef(0)
+  // A hold release stops the recorder to send. Stop and the 5-minute cap open the preview.
+  const sendOnStopRef = useRef(false)
+  // The composer root. A drag writes CSS variables here, not React state, so a move does not re-render.
+  const dragSurfaceRef = useRef<HTMLDivElement>(null)
+  const onSendRef = useRef(onSend)
+  onSendRef.current = onSend
 
   // Held or locked. Preview, cancel, and the 5-minute cap all leave this phase.
   useEffect(() => {
@@ -100,31 +111,30 @@ export function useVoiceRecorder({
     setPreviewFile(null)
   }, [previewUrl])
 
+  const setDragOffset = useCallback((x: number, y: number) => {
+    const style = dragSurfaceRef.current?.style
+    if (!style) return
+    style.setProperty('--voice-drag-x', `${x}px`)
+    style.setProperty('--voice-drag-y', `${y}px`)
+    style.setProperty('--voice-cancel-progress', String(-x / CANCEL_THRESHOLD_PX))
+  }, [])
+
   const resetGesture = useCallback(() => {
     setIsCancelArmed(false)
     setIsLocked(false)
     isCancelArmedRef.current = false
     isLockedRef.current = false
-  }, [])
+    setDragOffset(0, 0)
+  }, [setDragOffset])
 
-  const resetToIdle = useCallback(() => {
+  // The one way back to idle: Cancel, Discard, a short hold, an overlay, and unmount.
+  const discard = useCallback(() => {
     startIdRef.current++
-    clearTimers()
-    recorderRef.current = null
-    chunksRef.current = []
-    releaseStream()
-    revokePreview()
-    resetGesture()
-    setPhase('idle')
-    setElapsedMs(0)
-    setWaveformLevels(Array.from({ length: WAVEFORM_BAR_COUNT }, () => 0.15))
-  }, [clearTimers, releaseStream, revokePreview, resetGesture])
-
-  const cancelRecording = useCallback(() => {
+    sendOnStopRef.current = false
     clearTimers()
     const recorder = recorderRef.current
     // The recorder fires its stop event in a later task, after the reset below.
-    // Remove its handlers first, so that event cannot open a preview.
+    // Remove its handlers first, so that event cannot open a preview or send.
     if (recorder) {
       recorder.ondataavailable = null
       recorder.onstop = null
@@ -141,6 +151,7 @@ export function useVoiceRecorder({
     resetGesture()
     setPhase('idle')
     setElapsedMs(0)
+    setLiveLevels(IDLE_LEVELS)
   }, [clearTimers, releaseStream, revokePreview, resetGesture])
 
   // Read the live recorder, not this render's phase.
@@ -152,22 +163,22 @@ export function useVoiceRecorder({
     recorder.stop()
   }, [clearTimers])
 
-  const startWaveformLoop = useCallback(() => {
+  const startLevelLoop = useCallback(() => {
     const analyser = analyserRef.current
     if (!analyser) return
 
     const data = new Uint8Array(analyser.frequencyBinCount)
     const tick = () => {
       analyser.getByteFrequencyData(data)
-      const slice = Math.max(1, Math.floor(data.length / WAVEFORM_BAR_COUNT))
-      const levels = Array.from({ length: WAVEFORM_BAR_COUNT }, (_, i) => {
+      const slice = Math.max(1, Math.floor(data.length / LIVE_LEVEL_BARS))
+      const levels = Array.from({ length: LIVE_LEVEL_BARS }, (_, i) => {
         const start = i * slice
         let sum = 0
         for (let j = start; j < start + slice && j < data.length; j++) sum += data[j] ?? 0
         const avg = sum / slice
         return Math.max(0.12, Math.min(1, avg / 128))
       })
-      setWaveformLevels(levels)
+      setLiveLevels(levels)
       rafRef.current = requestAnimationFrame(tick)
     }
     rafRef.current = requestAnimationFrame(tick)
@@ -202,9 +213,7 @@ export function useVoiceRecorder({
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
         if (startId !== startIdRef.current) {
           stream.getTracks().forEach((track) => track.stop())
-          if (releasedEarlyRef.current) {
-            toast.Info('Hold the mic to record a voice note', { id: 'voice-hold-hint' })
-          }
+          if (releasedEarlyRef.current) showHoldHint()
           return
         }
         streamRef.current = stream
@@ -227,6 +236,8 @@ export function useVoiceRecorder({
 
         recorder.onstop = () => {
           releaseStream()
+          const send = sendOnStopRef.current
+          sendOnStopRef.current = false
 
           if (isCancelArmedRef.current) {
             chunksRef.current = []
@@ -248,6 +259,12 @@ export function useVoiceRecorder({
           }
 
           const file = new File([blob], voiceNoteFileName(mimeType), { type: mimeType })
+          if (send) {
+            onSendRef.current(file)
+            setPhase('idle')
+            setElapsedMs(0)
+            return
+          }
           revokePreview()
           const url = URL.createObjectURL(blob)
           setPreviewFile(file)
@@ -256,12 +273,16 @@ export function useVoiceRecorder({
         }
 
         recorder.start()
+        haptic()
         setPhase('recording')
         setElapsedMs(0)
-        const startedAt = Date.now()
-        tickRef.current = window.setInterval(() => setElapsedMs(Date.now() - startedAt), 250)
+        startedAtRef.current = Date.now()
+        tickRef.current = window.setInterval(
+          () => setElapsedMs(Date.now() - startedAtRef.current),
+          250
+        )
         stopTimerRef.current = window.setTimeout(() => stopRecording(), MAX_RECORD_MS)
-        startWaveformLoop()
+        startLevelLoop()
       } catch {
         // A replaced start must not tear down the recording that replaced it.
         if (startId !== startIdRef.current) return
@@ -281,31 +302,40 @@ export function useVoiceRecorder({
       releaseStream,
       resetGesture,
       revokePreview,
-      startWaveformLoop,
+      startLevelLoop,
       stopRecording,
       userId
     ]
   )
 
-  const moveHold = useCallback((clientX: number, clientY: number) => {
-    if (recorderRef.current?.state !== 'recording' || isLockedRef.current) return
+  const moveHold = useCallback(
+    (clientX: number, clientY: number) => {
+      if (recorderRef.current?.state !== 'recording' || isLockedRef.current) return
 
-    const cancelPx = Math.min(0, clientX - anchorRef.current.x)
-    const lockPx = Math.max(0, anchorRef.current.y - clientY)
+      const cancelPx = Math.min(0, clientX - anchorRef.current.x)
+      const lockPx = Math.max(0, anchorRef.current.y - clientY)
 
-    const cancelArmed = cancelPx < -CANCEL_THRESHOLD_PX
-    const locked = lockPx > LOCK_THRESHOLD_PX
+      const cancelArmed = cancelPx < -CANCEL_THRESHOLD_PX
+      const locked = lockPx > LOCK_THRESHOLD_PX
 
-    setIsCancelArmed(cancelArmed)
-    isCancelArmedRef.current = cancelArmed
+      if (cancelArmed !== isCancelArmedRef.current) {
+        if (cancelArmed) haptic()
+        isCancelArmedRef.current = cancelArmed
+        setIsCancelArmed(cancelArmed)
+      }
+      setDragOffset(Math.max(cancelPx, -CANCEL_THRESHOLD_PX), -Math.min(lockPx, LOCK_THRESHOLD_PX))
 
-    if (locked) {
-      setIsLocked(true)
-      isLockedRef.current = true
-      setIsCancelArmed(false)
-      isCancelArmedRef.current = false
-    }
-  }, [])
+      if (locked) {
+        haptic()
+        setIsLocked(true)
+        isLockedRef.current = true
+        setIsCancelArmed(false)
+        isCancelArmedRef.current = false
+        setDragOffset(0, 0)
+      }
+    },
+    [setDragOffset]
+  )
 
   const endHold = useCallback(() => {
     startIdRef.current++
@@ -315,37 +345,24 @@ export function useVoiceRecorder({
     }
     if (isLockedRef.current) return
     if (isCancelArmedRef.current) {
-      cancelRecording()
+      haptic()
+      discard()
       return
     }
+    if (Date.now() - startedAtRef.current < MIN_SEND_MS) {
+      discard()
+      showHoldHint()
+      return
+    }
+    sendOnStopRef.current = true
     stopRecording()
-  }, [cancelRecording, stopRecording])
+  }, [discard, stopRecording])
 
-  const confirmAttach = useCallback(() => {
+  const sendPreview = useCallback(() => {
     if (!previewFile) return
-    onAttach(previewFile)
-    revokePreview()
-    setPhase('idle')
-    setElapsedMs(0)
-  }, [onAttach, previewFile, revokePreview])
-
-  const discardPreview = useCallback(() => {
-    revokePreview()
-    setPhase('idle')
-    setElapsedMs(0)
-  }, [revokePreview])
-
-  const stopAndCleanup = useCallback(() => {
-    if (phase === 'recording') {
-      cancelRecording()
-      return
-    }
-    if (phase === 'preview') {
-      discardPreview()
-      return
-    }
-    resetToIdle()
-  }, [cancelRecording, discardPreview, phase, resetToIdle])
+    onSendRef.current(previewFile)
+    discard()
+  }, [discard, previewFile])
 
   const startLockedFromMenu = useCallback(async () => {
     if (phase !== 'idle') return
@@ -357,20 +374,21 @@ export function useVoiceRecorder({
   return {
     phase,
     elapsedMs,
-    elapsedLabel: formatElapsed(elapsedMs),
+    elapsedLabel: formatAudioClock(elapsedMs / 1000),
     previewUrl,
-    waveformLevels,
+    liveLevels,
     isCancelArmed,
     isLocked,
+    // Only a phone holds: desktop recording always starts locked.
+    isHolding: phase === 'recording' && !isLocked,
     isActive: phase === 'recording' || phase === 'preview',
+    dragSurfaceRef,
     startHold,
     moveHold,
     endHold,
     stopRecording,
-    cancelRecording,
-    confirmAttach,
-    discardPreview,
-    stopAndCleanup,
+    sendPreview,
+    discard,
     startLockedFromMenu
   }
 }

@@ -8,27 +8,25 @@ type Props = Pick<
   UseVoiceRecorderReturn,
   | 'phase'
   | 'elapsedLabel'
-  | 'waveformLevels'
+  | 'liveLevels'
   | 'isCancelArmed'
   | 'isLocked'
   | 'previewUrl'
-  | 'cancelRecording'
+  | 'discard'
   | 'stopRecording'
-  | 'confirmAttach'
-  | 'discardPreview'
+  | 'sendPreview'
 >
 
 export function VoiceRecordingBar({
   phase,
   elapsedLabel,
-  waveformLevels,
+  liveLevels,
   isCancelArmed,
   isLocked,
   previewUrl,
-  cancelRecording,
+  discard,
   stopRecording,
-  confirmAttach,
-  discardPreview
+  sendPreview
 }: Props) {
   const { isMobile } = useMessageComposer()
   if (phase !== 'recording' && phase !== 'preview') return null
@@ -58,15 +56,15 @@ export function VoiceRecordingBar({
         <button
           type="button"
           className={twMerge('btn btn-ghost btn-xs shrink-0', touchClassName)}
-          onClick={discardPreview}>
+          onClick={discard}>
           Discard
         </button>
         <button
           type="button"
           className={twMerge('btn btn-primary btn-xs shrink-0', touchClassName)}
-          data-testid="composer-recording-attach"
-          onClick={confirmAttach}>
-          Attach
+          data-testid="composer-recording-send"
+          onClick={sendPreview}>
+          Send
         </button>
       </div>
     )
@@ -85,7 +83,7 @@ export function VoiceRecordingBar({
       )}
       <span className="text-xs font-semibold tabular-nums">{elapsedLabel}</span>
       <div className="flex min-w-0 flex-1 items-center gap-0.5" aria-hidden>
-        {waveformLevels.map((level, index) => (
+        {liveLevels.map((level, index) => (
           <span
             key={index}
             className="bg-primary inline-block w-0.5 rounded-full motion-safe:transition-[height]"
@@ -96,9 +94,16 @@ export function VoiceRecordingBar({
       {/* Only the lock state is live. The elapsed time stays outside, so it is not read each second. */}
       <span role="status">
         {!isLocked ? (
-          <span className="text-base-content/50 text-[10px] leading-tight">
-            <span className="block">slide up to lock</span>
-            <span className="block">slide left to cancel</span>
+          // The slide hint follows the finger: the hold writes --voice-drag-x on the composer root.
+          <span
+            className="text-base-content/60 flex items-center text-xs"
+            style={{
+              transform: 'translateX(var(--voice-drag-x, 0px))',
+              opacity: 'calc(1 - var(--voice-cancel-progress, 0) * 0.6)'
+            }}>
+            <Icons.chevronLeft size={14} aria-hidden />
+            Slide to cancel
+            <span className="sr-only">, or up to lock</span>
           </span>
         ) : (
           <span className="text-base-content/60 text-[10px]">Recording locked</span>
@@ -116,7 +121,7 @@ export function VoiceRecordingBar({
         <button
           type="button"
           className={twMerge('btn btn-ghost btn-xs shrink-0', touchClassName)}
-          onClick={cancelRecording}>
+          onClick={discard}>
           Cancel
         </button>
       )}

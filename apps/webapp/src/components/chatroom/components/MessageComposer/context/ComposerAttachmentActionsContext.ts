@@ -1,7 +1,8 @@
 import { createContext, useContext } from 'react'
 
 export type ComposerAttachmentActions = {
-  addFiles: (files: FileList | File[]) => void
+  /** Returns the ids of the files it queued; a refused file gets none. */
+  addFiles: (files: FileList | File[]) => string[]
   removeAttachment: (id: string) => void
   retryAttachment: (id: string) => void
   toggleAttachmentSpoiler: (id: string) => void

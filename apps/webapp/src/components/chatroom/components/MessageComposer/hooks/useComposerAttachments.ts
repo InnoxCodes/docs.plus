@@ -148,15 +148,15 @@ export const useComposerAttachments = ({ workspaceId, channelId, userId }: Args)
   }, [draftKey, editKey, pruneExceptKeys])
 
   const addFiles = useCallback(
-    (files: FileList | File[]) => {
+    (files: FileList | File[]): string[] => {
       const runner = activeRunnerRef.current
-      if (!userId || !runner) return
+      if (!userId || !runner) return []
 
       const incoming = Array.from(files)
       const slotsLeft = CHAT_MEDIA_MAX_ATTACHMENTS - attachmentsRef.current.length
       if (slotsLeft <= 0) {
         toast.Error(`Maximum ${CHAT_MEDIA_MAX_ATTACHMENTS} attachments per message`)
-        return
+        return []
       }
       if (incoming.length > slotsLeft) {
         toast.Error(
@@ -166,6 +166,7 @@ export const useComposerAttachments = ({ workspaceId, channelId, userId }: Args)
 
       const memory = useChatStore.getState().workspaceSettings.channels.get(channelId)
       const addedInMode = Boolean(memory?.replyMessageMemory || memory?.commentMessageMemory)
+      const ids: string[] = []
       for (const file of incoming.slice(0, slotsLeft)) {
         const validationError = validateChatMediaFile(file)
         if (validationError) {
@@ -185,7 +186,9 @@ export const useComposerAttachments = ({ workspaceId, channelId, userId }: Args)
           { id, file, status: 'uploading', progress: 0 }
         ])
         runner.enqueue(id, file)
+        ids.push(id)
       }
+      return ids
     },
     [activeKey, activeRunnerRef, channelId, draftKey, pushModeAddedId, setAttachments, userId]
   )

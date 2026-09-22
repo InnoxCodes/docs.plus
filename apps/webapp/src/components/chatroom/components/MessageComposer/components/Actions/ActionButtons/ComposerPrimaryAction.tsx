@@ -82,23 +82,37 @@ export function ComposerPrimaryAction({ voice, className }: Props) {
   }
 
   return (
-    <Button
-      className={twMerge(
-        btnSize,
-        'shrink-0 border-0 p-0',
-        voice.phase === 'recording' && 'text-error',
-        // A browser pan fires pointercancel and ends the hold before a slide can lock or cancel.
-        isMobile && 'touch-none',
-        className
-      )}
-      data-testid="composer-primary-action"
-      onPointerDown={onPointerDown}
-      onPress={isMobile ? undefined : onPress}
-      tooltip={isMobile ? 'Hold to record' : 'Record voice note'}
-      tooltipPosition="top"
-      aria-label={isMobile ? 'Hold to record voice note' : 'Record voice note'}
-      aria-pressed={voice.phase === 'recording'}>
-      <Icons.mic size={iconSize} className="pointer-events-none shrink-0 stroke-[1.75]" />
-    </Button>
+    <div className="relative shrink-0">
+      {voice.isHolding ? (
+        // Rises with the finger (--voice-drag-y from the hold); past the lock line the note locks.
+        <span
+          aria-hidden
+          className="border-base-300 bg-base-100 text-base-content/60 absolute bottom-full left-1/2 z-10 mb-3 flex flex-col items-center gap-0.5 rounded-full border px-1.5 py-2 shadow-sm"
+          style={{ transform: 'translate(-50%, var(--voice-drag-y, 0px))' }}>
+          <Icons.lock size={14} />
+          <Icons.chevronUp size={14} />
+        </span>
+      ) : null}
+      <Button
+        className={twMerge(
+          btnSize,
+          'shrink-0 border-0 p-0',
+          voice.phase === 'recording' && 'text-error',
+          voice.isHolding &&
+            'bg-error text-error-content rounded-full motion-safe:scale-125 motion-safe:transition-transform',
+          // A browser pan fires pointercancel and ends the hold before a slide can lock or cancel.
+          isMobile && 'touch-none',
+          className
+        )}
+        data-testid="composer-primary-action"
+        onPointerDown={onPointerDown}
+        onPress={isMobile ? undefined : onPress}
+        tooltip={isMobile ? 'Hold to record' : 'Record voice note'}
+        tooltipPosition="top"
+        aria-label={isMobile ? 'Hold to record voice note' : 'Record voice note'}
+        aria-pressed={voice.phase === 'recording'}>
+        <Icons.mic size={iconSize} className="pointer-events-none shrink-0 stroke-[1.75]" />
+      </Button>
+    </div>
   )
 }
