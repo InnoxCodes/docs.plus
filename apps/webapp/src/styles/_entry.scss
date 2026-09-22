@@ -49,18 +49,6 @@
   }
 }
 
-// Telegram-style own-send: the optimistic bubble rises from the composer.
-// Transform-only — opacity is owned by the pending dim, and layout-neutral
-// transforms keep Virtuoso's height measurement untouched.
-@keyframes msg-send-in {
-  from {
-    transform: translateY(8px);
-  }
-  to {
-    transform: none;
-  }
-}
-
 // Settings "Star us on GitHub" delight. Shared tokens fail here: overlay-in
 // (120ms) cannot hold a pop-plus-burst. Region (220ms) is the house ceiling.
 @keyframes star-pop {

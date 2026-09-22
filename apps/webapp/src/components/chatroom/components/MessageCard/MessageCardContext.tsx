@@ -124,6 +124,9 @@ export const MessageCardProvider: React.FC<{
         )}
         data-mode={mode}
         data-msg-id={message.id}
+        // Only own optimistic rows have a client_id. The insert never writes
+        // messages.client_id, so server rows and merged echoes have none and get no stamp.
+        data-status={message.client_id ? message.status : undefined}
         data-message-type={presentation.displayType}
         data-message-layout={presentation.layout}
         data-msg-date={(message.created_at ?? '').slice(0, 10) || undefined}

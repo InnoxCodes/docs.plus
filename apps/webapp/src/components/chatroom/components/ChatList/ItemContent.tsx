@@ -11,7 +11,6 @@ import { SystemNotifyChip } from './SystemNotifyChip'
 
 export type ItemContentContext = {
   channelId: string
-  retry: (clientId: string) => void
   currentUserId: string | null
   variant: keyof ChatroomVariant
 }
@@ -89,27 +88,10 @@ export const ItemContent = ({ index, data, prevData, context }: ItemContentProps
     return <SystemNotifyChip message={data.row} variant={variant} />
   }
   if (isMessage(data) && grouped) {
-    const onRetry = data.client_id ? () => context?.retry(data.client_id!) : undefined
     if (variant === 'mobile') {
-      return (
-        <MobileMessageBody
-          index={index}
-          message={grouped}
-          compact={compact}
-          status={data.status}
-          onRetry={onRetry}
-        />
-      )
+      return <MobileMessageBody index={index} message={grouped} />
     }
-    return (
-      <DesktopMessageBody
-        index={index}
-        grouped={grouped}
-        compact={compact}
-        status={data.status}
-        onRetry={onRetry}
-      />
-    )
+    return <DesktopMessageBody index={index} grouped={grouped} />
   }
   return null
 }

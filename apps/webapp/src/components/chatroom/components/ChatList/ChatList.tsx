@@ -17,7 +17,6 @@ import { StickyDayHeader } from './StickyDayHeader'
 
 export type ChatListContext = {
   channelId: string
-  retry: (clientId: string) => void
   onAtBottomChange: (atBottom: boolean) => void
   currentUserId: string | null
   variant: keyof ChatroomVariant
@@ -46,7 +45,6 @@ const ChatListFooter: VirtuosoMessageListProps<ChatItem, ChatListContext>['Foote
 
 export type ChatListProps = {
   channelId: string
-  retry: (clientId: string) => void
   onAtBottomChange: (atBottom: boolean) => void
   onLastVisibleIndexChange?: (index: number) => void
   initialData?: ChatItem[]
@@ -75,7 +73,6 @@ export const ChatList = forwardRef<
   (
     {
       channelId,
-      retry,
       onAtBottomChange,
       onLastVisibleIndexChange,
       initialData = [],
@@ -94,14 +91,13 @@ export const ChatList = forwardRef<
     const context = useMemo<ChatListContext>(
       () => ({
         channelId,
-        retry,
         onAtBottomChange,
         currentUserId,
         variant,
         loadingOlder,
         loadingNewer
       }),
-      [channelId, retry, onAtBottomChange, currentUserId, variant, loadingOlder, loadingNewer]
+      [channelId, onAtBottomChange, currentUserId, variant, loadingOlder, loadingNewer]
     )
     const onScroll = useCallback(
       (location: ListScrollLocation) => {

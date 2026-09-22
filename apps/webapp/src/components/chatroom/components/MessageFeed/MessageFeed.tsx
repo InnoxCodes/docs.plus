@@ -21,7 +21,6 @@ const MessageFeed = ({ className, showScrollToBottom = true }: Props) => {
     channelId,
     variant,
     listRef,
-    retry,
     onAtBottomChange,
     onLastVisibleIndexChange,
     atBottom,
@@ -80,7 +79,6 @@ const MessageFeed = ({ className, showScrollToBottom = true }: Props) => {
             <ChatList
               ref={listRef as any}
               channelId={channelId}
-              retry={retry}
               onAtBottomChange={onAtBottomChange}
               onLastVisibleIndexChange={onLastVisibleIndexChange}
               loadOlder={loadOlder}

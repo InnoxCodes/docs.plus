@@ -1,15 +1,11 @@
 import { MessageCard } from '@components/chatroom/components/MessageCard/MessageCard'
 import type { TGroupedMsgRow } from '@types'
 
-import type { MessageStatus } from '../../../../types/message'
 import { MessageHoverMenu } from './MessageHoverMenu'
 
 type Props = {
   index: number
   grouped: TGroupedMsgRow
-  compact: boolean
-  status?: MessageStatus
-  onRetry?: () => void
 }
 
 function DesktopMessageFooter({ compact }: { compact: boolean }) {
@@ -45,14 +41,10 @@ function DesktopMessageFooter({ compact }: { compact: boolean }) {
   )
 }
 
-export const DesktopMessageBody = ({ index, grouped, compact, status, onRetry }: Props) => {
+export const DesktopMessageBody = ({ index, grouped }: Props) => {
+  const compact = !grouped.isGroupStart
   return (
-    <MessageCard
-      index={index}
-      message={grouped}
-      compact={compact}
-      status={status}
-      onRetry={onRetry}>
+    <MessageCard index={index} message={grouped}>
       <div className="flex w-full items-start gap-2">
         <div className="relative flex w-10 shrink-0 flex-col items-center">
           {!compact ? (

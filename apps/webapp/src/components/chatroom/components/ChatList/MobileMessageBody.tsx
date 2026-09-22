@@ -5,14 +5,9 @@ import type { TGroupedMsgRow } from '@types'
 import type { ReactNode } from 'react'
 import { twMerge } from 'tailwind-merge'
 
-import type { MessageStatus } from '../../../../types/message'
-
 type Props = {
   index: number
   message: TGroupedMsgRow
-  compact: boolean
-  status?: MessageStatus
-  onRetry?: () => void
 }
 
 function MobileChatBubble({ message, children }: { message: TGroupedMsgRow; children: ReactNode }) {
@@ -51,15 +46,10 @@ function MobileMessageFooter({ children }: { children: ReactNode }) {
 }
 
 /** Mobile chat-bubble shell; owner alignment comes from `MessageCardContext`. */
-export const MobileMessageBody = ({ index, message, compact, status, onRetry }: Props) => {
+export const MobileMessageBody = ({ index, message }: Props) => {
   return (
     <MessageCard.LongPressMenu message={message}>
-      <MessageCard
-        message={message}
-        index={index}
-        compact={compact}
-        status={status}
-        onRetry={onRetry}>
+      <MessageCard message={message} index={index}>
         {!message.isOwner && (
           <div className="chat-image avatar">
             {message.isGroupStart ? (
