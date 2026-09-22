@@ -274,6 +274,26 @@ export async function fetchEmailStats(): Promise<EmailStats> {
   return fetchApi('/api/admin/stats/email')
 }
 
+export type DigestGrouping = 'document' | 'aggregate'
+
+export interface DigestMailSettings {
+  grouping: DigestGrouping
+  maxKb: number
+}
+
+export async function fetchDigestGrouping(): Promise<DigestMailSettings> {
+  return fetchApi('/api/admin/email/digest-grouping')
+}
+
+export async function saveDigestGrouping(
+  body: Partial<DigestMailSettings>
+): Promise<DigestMailSettings> {
+  return fetchApi('/api/admin/email/digest-grouping', {
+    method: 'PUT',
+    body: JSON.stringify(body)
+  })
+}
+
 export async function fetchSupabaseStats(): Promise<SupabaseStats> {
   return fetchApi('/api/admin/stats/platform')
 }

@@ -38,44 +38,44 @@
     <td style="padding-bottom: <%= it.h.SPACING.md %>;">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
         <tr>
-          <td style="background-color: <%= it.h.COLORS.background %>; border-radius: <%= it.h.RADIUS.md %>; border: 1px solid <%= it.h.COLORS.border %>; padding: <%= it.h.SPACING.md %>;">
-            <span style="color: <%= it.h.COLORS.textMuted %>; font-size: 13px;"><%= it.h.changeWindowLine(doc.content_changes.since, doc.content_changes.fromLastLeft, it.frequency, it.periodEnd) %></span>
-<% /* The helper returns '' when the count is absent or under 1, so the guard is
-      what keeps "0 people contributed" out of the mail. */ -%>
-<% var contributorsText = it.h.contributorLine(doc.content_changes.contributorCount) -%>
-<% if (contributorsText) { -%>
-            <span style="color: <%= it.h.COLORS.textLight %>; font-size: 12px; margin-left: <%= it.h.SPACING.sm %>;"><%= contributorsText %></span>
-<% } -%>
-<% /* A block whose enrichment failed carries no sections, so guard the list. */ -%>
+          <td style="padding: 4px 2px 8px; font-family: <%~ it.h.FONT_STACK %>;">
+            <p style="margin: 0; padding-bottom: 12px; border-bottom: 1px solid <%= it.h.COLORS.border %>; color: <%= it.h.COLORS.textMuted %>; font-size: 12px; line-height: 1.4;"><%= it.h.changeWindowLine(doc.content_changes.since, doc.content_changes.fromLastLeft, it.frequency, it.periodEnd) %><% var contributorsText = it.h.contributorLine(doc.content_changes.contributorCount) -%><% if (contributorsText) { %> <span style="color: <%= it.h.COLORS.textLight %>;"><%= contributorsText %></span><% } -%></p>
+<% /* A block whose enrichment failed carries no sections, so guard the page. */ -%>
 <% if (doc.content_changes.sections && doc.content_changes.sections.length) { -%>
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top: <%= it.h.SPACING.sm %>;">
-<% doc.content_changes.sections.forEach(function(section) { -%>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+<% doc.content_changes.sections.forEach(function(section, index) { -%>
               <tr>
-                <td style="padding: <%= it.h.SPACING.sm %> 0; border-top: 1px solid <%= it.h.COLORS.border %>;">
-                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                    <tr>
-                      <td valign="top">
-                        <p style="margin: 0; color: <%= it.h.COLORS.text %>; font-size: 13px; font-weight: 500;">
-                          <%= section.text %>
-                        </p>
-<% if (section.breadcrumb && section.breadcrumb.length) { -%>
-                        <p style="margin: <%= it.h.SPACING.xs %> 0 0; color: <%= it.h.COLORS.textMuted %>; font-size: 12px; line-height: 1.4;">
-                          <%= section.breadcrumb.join(' > ') %>
-                        </p>
+                <td style="padding-top: <%= index === 0 ? '18px' : '22px' %>;">
+                  <a href="<%= section.url %>" style="color: <%= it.h.COLORS.text %>; font-size: 18px; font-weight: 700; line-height: 1.25; text-decoration: none;"><%= section.text %></a>
+<% if (section.runs && section.runs.length) { -%>
+                  <p style="margin: 6px 0 0; color: <%= it.h.COLORS.text %>; font-size: 15px; line-height: 1.45; font-weight: 400;">
+<% section.runs.forEach(function(run) { -%>
+<span style="<%= it.h.changeRunStyle(run.kind) %>"><%= run.text %></span><% }) -%>
+                  </p>
+<% } else { -%>
+<% if (section.excerpt) { -%>
+                  <p style="margin: 6px 0 0; color: <%= it.h.COLORS.text %>; font-size: 15px; line-height: 1.45;">
+                    <span style="<%= it.h.changeRunStyle('added') %>"><%= section.excerpt %></span>
+                  </p>
 <% } -%>
-                      </td>
-                      <td width="50" align="right" valign="middle">
-                        <a href="<%= section.url %>" style="color: <%= it.h.COLORS.primary %>; font-size: 12px; text-decoration: none; font-weight: 500;">View</a>
-                      </td>
-                    </tr>
-                  </table>
+<% if (section.removed) { -%>
+                  <p style="margin: 6px 0 0; color: <%= it.h.COLORS.text %>; font-size: 15px; line-height: 1.45;">
+                    <span style="<%= it.h.changeRunStyle('removed') %>"><%= section.removed %></span>
+                  </p>
+<% } -%>
+<% } -%>
+<% if (section.chats && section.chats.length) { -%>
+<% section.chats.forEach(function(chat) { -%>
+                  <p style="margin: 8px 0 0; color: <%= it.h.COLORS.text %>; font-size: 15px; line-height: 1.45;"><span style="color: <%= it.h.COLORS.textMuted %>;">💬 <%= chat.at %></span> <strong><%= chat.sender %>:</strong> <%= chat.text %></p>
+<% }) -%>
+<% } -%>
                 </td>
               </tr>
 <% }) -%>
 <% if (doc.content_changes.moreCount) { -%>
               <tr>
-                <td style="padding: <%= it.h.SPACING.sm %> 0; color: <%= it.h.COLORS.textLight %>; font-size: 11px; text-align: center;">
-                  +<%= doc.content_changes.moreCount %> more
+                <td style="padding-top: 14px; color: <%= it.h.COLORS.textLight %>; font-size: 12px;">
+                  <%= doc.content_changes.moreCount %> more section<%= doc.content_changes.moreCount === 1 ? '' : 's' %> changed.
                 </td>
               </tr>
 <% } -%>

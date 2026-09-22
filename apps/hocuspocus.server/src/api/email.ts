@@ -225,12 +225,29 @@ function digestPreviewDocuments(appUrl: string): DigestDocument[] {
         sections: [
           {
             text: 'Rate limiting',
-            breadcrumb: ['API Documentation', 'Authentication'],
-            url: `${appUrl}/api-documentation?id=rate-limiting`
+            url: `${appUrl}/api-documentation?id=rate-limiting`,
+            tocId: 'rate-limiting',
+            excerpt: 'Requests over the cap wait.',
+            removed: 'Requests over the cap fail.',
+            runs: [
+              { kind: 'same', text: 'Requests over the cap ' },
+              { kind: 'removed', text: 'fail' },
+              { kind: 'added', text: ' wait' },
+              {
+                kind: 'same',
+                text: '. Later retries use the same key and stay in the queue until a slot opens.'
+              }
+            ],
+            chats: [
+              {
+                at: '2026-09-21 09:14',
+                sender: 'Lena',
+                text: 'The cap should wait, not fail.'
+              }
+            ]
           },
           {
             text: 'Error codes',
-            breadcrumb: ['API Documentation'],
             url: `${appUrl}/api-documentation?id=error-codes`
           }
         ],

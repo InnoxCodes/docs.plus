@@ -119,6 +119,17 @@ export function buildDigestDocuments(
   }))
 }
 
+export type DigestGrouping = 'document' | 'aggregate'
+
+/** One mail per document, unless an admin has chosen a single combined mail. */
+export function groupDigestDocuments(
+  documents: DigestDocument[],
+  grouping: DigestGrouping
+): DigestDocument[][] {
+  if (grouping === 'aggregate' || documents.length <= 1) return [documents]
+  return documents.map((document) => [document])
+}
+
 /** The payload frequency is the user's preference, not the queue type. */
 export function normaliseDigestFrequency(raw: string | undefined): 'daily' | 'weekly' {
   return raw === 'weekly' ? 'weekly' : 'daily'

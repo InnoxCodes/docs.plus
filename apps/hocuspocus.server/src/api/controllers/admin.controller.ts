@@ -1,4 +1,12 @@
+import type { DigestGrouping } from '../../lib/email/digestDocuments'
+import {
+  readDigestGrouping,
+  readDigestMaxKb,
+  writeDigestGrouping,
+  writeDigestMaxKb
+} from '../../lib/email/digestGrouping'
 import { adminLogger } from '../../lib/logger'
+import { getRedisClient } from '../../lib/redis'
 import type { AppContext } from '../../types/hono.types'
 import * as stats from '../services/adminStats.service'
 import { getSupabaseClient } from '../utils/supabase'
@@ -136,6 +144,47 @@ export async function toggleAdminRole(c: AppContext) {
   } catch (error) {
     adminLogger.error({ err: error }, 'Failed to toggle admin role')
     return c.json({ error: 'Failed to toggle admin role' }, 500)
+  }
+}
+
+export async function getDigestGrouping(c: AppContext) {
+  try {
+    const redis = getRedisClient()
+    return c.json({
+      grouping: await readDigestGrouping(redis),
+      maxKb: await readDigestMaxKb(redis)
+    })
+  } catch (error) {
+    adminLogger.error({ err: error }, 'Failed to read digest grouping')
+    return c.json({ error: 'Failed to read digest grouping' }, 500)
+  }
+}
+
+export async function setDigestGrouping(c: AppContext) {
+  const body = await c.req.json().catch(() => null)
+  const grouping = body?.grouping as DigestGrouping | undefined
+  const maxKb = body?.maxKb === undefined ? undefined : Number(body.maxKb)
+  if (grouping !== undefined && grouping !== 'document' && grouping !== 'aggregate') {
+    return c.json({ error: 'grouping must be document or aggregate' }, 400)
+  }
+  if (maxKb !== undefined && (!Number.isInteger(maxKb) || maxKb < 10 || maxKb > 102)) {
+    return c.json({ error: 'maxKb must be a whole number from 10 to 102' }, 400)
+  }
+  if (grouping === undefined && maxKb === undefined) {
+    return c.json({ error: 'grouping or maxKb is required' }, 400)
+  }
+  const redis = getRedisClient()
+  if (!redis) return c.json({ error: 'Redis is not available' }, 503)
+  try {
+    if (grouping) await writeDigestGrouping(redis, grouping)
+    if (maxKb !== undefined) await writeDigestMaxKb(redis, maxKb)
+    return c.json({
+      grouping: await readDigestGrouping(redis),
+      maxKb: await readDigestMaxKb(redis)
+    })
+  } catch (error) {
+    adminLogger.error({ err: error }, 'Failed to save digest grouping')
+    return c.json({ error: 'Failed to save digest grouping' }, 500)
   }
 }
 

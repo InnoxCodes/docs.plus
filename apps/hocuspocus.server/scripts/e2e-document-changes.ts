@@ -193,7 +193,7 @@ interface ResponseSection {
   tocId: string | null
   text: string
   level: number
-  status: 'added' | 'removed' | 'modified' | 'unchanged'
+  status: 'added' | 'removed' | 'modified' | 'moved' | 'unchanged'
   magnitude: {
     wordsAdded: number
     wordsRemoved: number
@@ -215,6 +215,7 @@ interface ChangesData {
     sectionsAdded: number
     sectionsRemoved: number
     sectionsModified: number
+    sectionsMoved: number
     wordsAdded: number
     wordsRemoved: number
     versions: number
@@ -398,6 +399,7 @@ try {
       sectionsAdded: flat.filter((node) => node.status === 'added').length,
       sectionsRemoved: flat.filter((node) => node.status === 'removed').length,
       sectionsModified: flat.filter((node) => node.status === 'modified').length,
+      sectionsMoved: flat.filter((node) => node.status === 'moved').length,
       wordsAdded: flat.reduce((total, node) => total + (node.magnitude?.wordsAdded ?? 0), 0),
       wordsRemoved: flat.reduce((total, node) => total + (node.magnitude?.wordsRemoved ?? 0), 0)
     }
@@ -416,7 +418,8 @@ try {
     check(
       data?.summary.sectionsAdded === rolled.sectionsAdded &&
         data?.summary.sectionsRemoved === rolled.sectionsRemoved &&
-        data?.summary.sectionsModified === rolled.sectionsModified,
+        data?.summary.sectionsModified === rolled.sectionsModified &&
+        data?.summary.sectionsMoved === rolled.sectionsMoved,
       'the summary section counts equal the sums over the flattened tree'
     )
     check(

@@ -12,7 +12,12 @@ import {
   type EmailFooter,
   footerLinksText
 } from './helpers'
-import type { DigestDocument, DigestFrequency, NotificationType } from './types'
+import type { DigestChangeRun, DigestDocument, DigestFrequency, NotificationType } from './types'
+
+function paintRuns(runs: readonly DigestChangeRun[]): string {
+  const text = runs.map((run) => run.text).join('')
+  return text ? `\n      ${text}` : ''
+}
 
 export function buildNotificationEmailText(params: {
   recipientName: string
@@ -117,10 +122,17 @@ function buildDigestEmailText(params: {
       // is byte-identical on both surfaces.
       const changes = doc.content_changes
       const sectionLines = (changes?.sections ?? []).map((section) => {
-        const trail = section.breadcrumb.length ? `${section.breadcrumb.join(' > ')} > ` : ''
-        return `    - ${trail}${section.text}: ${section.url}`
+        const painted = section.runs?.length ? paintRuns(section.runs) : ''
+        const added = !painted && section.excerpt ? `\n      + ${section.excerpt}` : ''
+        const removed = !painted && section.removed ? `\n      - ${section.removed}` : ''
+        const chats = (section.chats ?? [])
+          .map((chat) => `\n      ${chat.at} ${chat.sender}: ${chat.text}`)
+          .join('')
+        return `    ${section.text}\n      ${section.url}${painted}${added}${removed}${chats}`
       })
-      const moreLine = changes?.moreCount ? `    +${changes.moreCount} more` : ''
+      const moreLine = changes?.moreCount
+        ? `    ${changes.moreCount} more section${changes.moreCount === 1 ? '' : 's'} changed.`
+        : ''
       // An indented empty string is truthy, so the guard is what keeps the blank
       // line out when the helper declines to name a contributor.
       const contributors = contributorLine(changes?.contributorCount)

@@ -1,7 +1,7 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { GetServerSideProps } from 'next'
 import Head from 'next/head'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   LuBell,
   LuBellOff,
@@ -30,10 +30,13 @@ import { CollapsibleSection } from '@/components/ui/CollapsibleSection'
 import {
   checkEmailGatewayHealth,
   checkPushGatewayHealth,
+  type DigestGrouping,
+  fetchDigestGrouping,
   fetchEmailStats,
   fetchNotificationStats,
   fetchPushPipelineStats,
-  fetchPushStats
+  fetchPushStats,
+  saveDigestGrouping
 } from '@/services/api'
 import { fetchFailedPushSubscriptions, fetchRecentPushActivity } from '@/services/supabase'
 import type { PushGatewayHealth, PushPipelineStats, PushSubscriptionDetail } from '@/types'
@@ -354,6 +357,23 @@ export default function NotificationsPage() {
     queryFn: () => fetchRecentPushActivity(10)
   })
 
+  const queryClient = useQueryClient()
+  const { data: digestGrouping, isLoading: digestGroupingLoading } = useQuery({
+    queryKey: ['admin', 'email', 'digest-grouping'],
+    queryFn: fetchDigestGrouping
+  })
+  const digestGroupingMutation = useMutation({
+    mutationFn: (body: { grouping?: DigestGrouping; maxKb?: number }) => saveDigestGrouping(body),
+    onSuccess: (result) => {
+      queryClient.setQueryData(['admin', 'email', 'digest-grouping'], result)
+    }
+  })
+  const grouping = digestGrouping?.grouping ?? 'document'
+  const [maxKb, setMaxKb] = useState('90')
+  useEffect(() => {
+    if (digestGrouping?.maxKb) setMaxKb(String(digestGrouping.maxKb))
+  }, [digestGrouping?.maxKb])
+
   const loading = notifLoading || pushLoading || emailLoading
   const debugLoading =
     gatewayLoading || pipelineLoading || failedSubsLoading || recentActivityLoading
@@ -434,6 +454,52 @@ export default function NotificationsPage() {
               </div>
               <StatusBadge status={emailGatewayHealth?.status || 'down'} />
             </div>
+          </div>
+
+          <div className="bg-base-100 rounded-box border-base-300 flex flex-wrap items-center justify-between gap-3 border p-4">
+            <div>
+              <p className="font-medium">Digest mail</p>
+              <p className="text-base-content/60 text-xs">
+                One mail per document, or one mail that gathers every document.
+              </p>
+            </div>
+            <div className="join">
+              <button
+                type="button"
+                className={`btn btn-sm join-item ${grouping === 'document' ? 'btn-primary' : 'btn-ghost'}`}
+                disabled={digestGroupingLoading || digestGroupingMutation.isPending}
+                onClick={() => digestGroupingMutation.mutate({ grouping: 'document' })}>
+                Per document
+              </button>
+              <button
+                type="button"
+                className={`btn btn-sm join-item ${grouping === 'aggregate' ? 'btn-primary' : 'btn-ghost'}`}
+                disabled={digestGroupingLoading || digestGroupingMutation.isPending}
+                onClick={() => digestGroupingMutation.mutate({ grouping: 'aggregate' })}>
+                One mail
+              </button>
+            </div>
+            <label className="flex items-center gap-2 text-sm">
+              Size limit
+              <input
+                type="number"
+                min={10}
+                max={102}
+                className="input input-sm input-bordered w-20"
+                value={maxKb}
+                disabled={digestGroupingLoading || digestGroupingMutation.isPending}
+                onChange={(event) => setMaxKb(event.target.value)}
+                onBlur={() => {
+                  const next = Number(maxKb)
+                  if (!Number.isInteger(next) || next < 10 || next > 102) {
+                    setMaxKb(String(digestGrouping?.maxKb ?? 90))
+                    return
+                  }
+                  if (next !== digestGrouping?.maxKb) digestGroupingMutation.mutate({ maxKb: next })
+                }}
+              />
+              KB
+            </label>
           </div>
 
           <PushPipelineFlow

@@ -3,10 +3,12 @@ import type { DigestDocument, DigestFrequency, NotificationType } from '@docs.pl
 
 export type {
   DigestChangedSection,
+  DigestChangeRun,
   DigestChannel,
   DigestContentChanges,
   DigestDocument,
   DigestFrequency,
+  DigestHeadingChat,
   DigestNotification,
   EmailFooter,
   NotificationType

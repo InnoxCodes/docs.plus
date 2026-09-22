@@ -3,6 +3,7 @@
  * owns only the email-specific message mapping, status updates, and RPC names.
  */
 
+import { fitDigestDocuments } from '@docs.plus/email-templates'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import { config } from '../../config/env'
@@ -19,13 +20,16 @@ import { emailLogger } from '../logger'
 import { createPgmqConsumer, deterministicJobId } from '../pgmqConsumer'
 import { prisma } from '../prisma'
 import { getOwnerProfiles } from '../profiles'
+import { getRedisClient } from '../redis'
 import { type DigestDocumentMeta, enrichDigestDocuments } from './digestContentChanges'
 import {
   buildDigestDocuments,
   CONTENT_CHANGE_TYPE,
   type DigestRawNotification,
+  groupDigestDocuments,
   normaliseDigestFrequency
 } from './digestDocuments'
+import { readDigestGrouping, readDigestMaxKb } from './digestGrouping'
 import {
   decideDigestOutcome,
   type DigestMetadataRow,
@@ -112,31 +116,33 @@ interface WorkspaceMemberVisitRow {
  * roster's `get_document_members`. That one answers "Last seen", where an
  * arrival is right. Membership lives in Supabase, so Prisma cannot answer this.
  */
-async function readDigestLastVisit(
+async function readDigestLastVisits(
   client: SupabaseClient,
   recipientId: string,
-  documentId: string
-): Promise<Date | null> {
-  if (!recipientId) return null
+  documentIds: string[]
+): Promise<Map<string, Date | null>> {
+  const visits = new Map<string, Date | null>()
+  if (!recipientId || documentIds.length === 0) return visits
 
   const { data, error } = await client
     .from('workspace_members')
-    .select('last_connection_closed_at')
+    .select('workspace_id, last_connection_closed_at')
     .eq('member_id', recipientId)
     // The exact-case documentId. workspace_slug is lower(documentId) and matches nothing here.
-    .eq('workspace_id', documentId)
+    .in('workspace_id', documentIds)
     .is('left_at', null)
-    .maybeSingle()
 
   if (error) {
     // No Last left means the frequency window, so a failed read widens the
     // window rather than costing the reader the block.
-    emailLogger.warn({ err: error, recipientId, documentId }, 'Digest last-visit read failed')
-    return null
+    emailLogger.warn({ err: error, recipientId }, 'Digest last-visit read failed')
+    return visits
   }
 
-  const row = data as WorkspaceMemberVisitRow | null
-  return parseLastVisitStamp(row?.last_connection_closed_at)
+  for (const row of (data ?? []) as (WorkspaceMemberVisitRow & { workspace_id: string })[]) {
+    visits.set(row.workspace_id, parseLastVisitStamp(row.last_connection_closed_at))
+  }
+  return visits
 }
 
 /**
@@ -176,7 +182,7 @@ async function processDigestMessage(
       enriched = await enrichDigestDocuments(built, {
         computeChanges: computeDocumentChanges,
         readMetadata: async (documentId: string) => metaById.get(documentId) ?? null,
-        readLastVisit: (reader, documentId) => readDigestLastVisit(client, reader, documentId),
+        readLastVisits: (reader, documentIds) => readDigestLastVisits(client, reader, documentIds),
         logger: emailLogger,
         appUrl,
         recipientId,
@@ -217,30 +223,43 @@ async function processDigestMessage(
       return true
     }
 
-    const digestPayload: DigestEmailRequest = {
-      to: payload.recipient_email!,
-      recipient_name: payload.recipient_name || 'User',
-      recipient_id: payload.recipient_id!,
-      frequency,
-      documents: outcome.documents,
-      period_end: now.toISOString()
-    }
+    const redis = getRedisClient()
+    const grouping = await readDigestGrouping(redis)
+    const maxBytes = (await readDigestMaxKb(redis)) * 1024
+    const groups = groupDigestDocuments(outcome.documents, grouping)
+    const queueKey = [...queueIds].sort().join(',')
 
-    const idempotencyJobId = deterministicJobId(
-      'digest',
-      payload.recipient_id,
-      payload.frequency,
-      [...queueIds].sort().join(',')
-    )
-
-    const jobId = await queueEmail(
-      { type: 'digest', payload: digestPayload, created_at: new Date().toISOString() },
-      idempotencyJobId
-    )
-
-    if (!jobId) {
-      emailLogger.warn({ msgId }, 'Failed to queue digest email job')
-      return false
+    for (const documents of groups) {
+      const docKey = documents.map((document) => document.workspace_id || document.slug).join(',')
+      const fitted = fitDigestDocuments(
+        {
+          recipientName: payload.recipient_name || 'User',
+          frequency,
+          documents,
+          periodEnd: now.toISOString()
+        },
+        maxBytes
+      )
+      const digestPayload: DigestEmailRequest = {
+        to: payload.recipient_email!,
+        recipient_name: payload.recipient_name || 'User',
+        recipient_id: payload.recipient_id!,
+        frequency,
+        documents: fitted,
+        period_end: now.toISOString()
+      }
+      const idempotencyJobId =
+        grouping === 'aggregate'
+          ? deterministicJobId('digest', payload.recipient_id, payload.frequency, queueKey)
+          : deterministicJobId('digest', payload.recipient_id, payload.frequency, docKey, queueKey)
+      const jobId = await queueEmail(
+        { type: 'digest', payload: digestPayload, created_at: new Date().toISOString() },
+        idempotencyJobId
+      )
+      if (!jobId) {
+        emailLogger.warn({ msgId, docKey }, 'Failed to queue digest email job')
+        return false
+      }
     }
 
     // Per-row updates are independent single-row UPSERTs keyed on distinct
@@ -253,7 +272,8 @@ async function processDigestMessage(
     emailLogger.info(
       {
         msgId,
-        jobId,
+        grouping,
+        mails: groups.length,
         to: payload.recipient_email,
         notifications: (payload.notifications || []).length
       },

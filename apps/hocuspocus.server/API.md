@@ -691,6 +691,7 @@ It reads Postgres in the REST process and never opens the live document. Neither
       "sectionsAdded": 1,
       "sectionsRemoved": 0,
       "sectionsModified": 2,
+      "sectionsMoved": 0,
       "wordsAdded": 74,
       "wordsRemoved": 12,
       "versions": 7,
@@ -718,17 +719,17 @@ The `baseline` above is older than the requested `since`. That is the anchor rul
 | `until`    | The same, filled in with the request instant when the caller omitted it                           |
 | `baseline` | `{ version, createdAt }` of the older row used, or `null` when no row is old enough               |
 | `head`     | `{ version, createdAt }` of the newer row used, or `null` when no row exists at or before `until` |
-| `changed`  | Whether any section is `added`, `removed` or `modified`                                           |
+| `changed`  | Whether any section is `added`, `removed`, `modified`, or `moved`                                 |
 | `summary`  | The rollup, described below                                                                       |
 | `sections` | The outline tree. Present only for `scope=headings`                                               |
 
-| `summary` field                                          | Meaning                                                                                    |
-| -------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `sectionsAdded` / `sectionsRemoved` / `sectionsModified` | How many sections carry that status, counted over the whole tree and not only its roots    |
-| `wordsAdded` / `wordsRemoved`                            | The section magnitudes summed. A `null` magnitude contributes `0`                          |
-| `versions`                                               | How many rows were stored in the window, counted by version number                         |
-| `triggers`                                               | The distinct non-null `trigger` values on those rows. A debounced save carries `websocket` |
-| `contributors`                                           | Profiles for every account those rows name, the `triggeredBy` of each row included         |
+| `summary` field                                                            | Meaning                                                                                    |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `sectionsAdded` / `sectionsRemoved` / `sectionsModified` / `sectionsMoved` | How many sections carry that status, counted over the whole tree and not only its roots    |
+| `wordsAdded` / `wordsRemoved`                                              | The section magnitudes summed. A `null` magnitude contributes `0`                          |
+| `versions`                                                                 | How many rows were stored in the window, counted by version number                         |
+| `triggers`                                                                 | The distinct non-null `trigger` values on those rows. A debounced save carries `websocket` |
+| `contributors`                                                             | Profiles for every account those rows name, the `triggeredBy` of each row included         |
 
 `contributors` carries the same [`public.users` columns](#get-apidocumentsdocumentidversions) the history sidebar renders. The field is named for contributors, and it holds every account the window's rows name, so it is a superset of the editors.
 
@@ -763,15 +764,17 @@ A named checkpoint of an unchanged document mints a row whose bytes duplicate it
 }
 ```
 
-| Field       | Meaning                                                                                            |
-| ----------- | -------------------------------------------------------------------------------------------------- |
-| `tocId`     | The heading's stored `toc-id`, or `null`. Sanitized and cut at 200 characters                      |
-| `text`      | The heading's text, sanitized and cut at 200 characters. `""` on the preamble                      |
-| `level`     | The heading level, clamped to 1–6. A non-numeric stored level reads as `1`. `0` marks the preamble |
-| `status`    | One of `added`, `removed`, `modified`, `unchanged` — see [Section status](#section-status)         |
-| `magnitude` | `{ wordsAdded, wordsRemoved, blocksBefore, blocksAfter }`, or `null` when nothing countable moved  |
-| `excerpt`   | Up to 140 characters of the text that arrived. The key is omitted when there is nothing to show    |
-| `children`  | Nested sections. Always an array, often empty                                                      |
+| Field            | Meaning                                                                                              |
+| ---------------- | ---------------------------------------------------------------------------------------------------- |
+| `tocId`          | The heading's stored `toc-id`, or `null`. Sanitized and cut at 200 characters                        |
+| `text`           | The heading's text, sanitized and cut at 200 characters. `""` on the preamble                        |
+| `level`          | The heading level, clamped to 1–6. A non-numeric stored level reads as `1`. `0` marks the preamble   |
+| `status`         | One of `added`, `removed`, `modified`, `moved`, `unchanged` — see [Section status](#section-status)  |
+| `magnitude`      | `{ wordsAdded, wordsRemoved, blocksBefore, blocksAfter }`, or `null` when nothing countable moved    |
+| `excerpt`        | Up to 140 characters of the text that arrived. The key is omitted when there is nothing to show      |
+| `removedExcerpt` | Up to 140 characters of the text that left. A removed section puts its body here. Omitted when empty |
+| `runs`           | Ordered same, removed, and added text around the edit. Omitted when empty                            |
+| `children`       | Nested sections. Always an array, often empty                                                        |
 
 **A section is one heading plus the top-level nodes up to the next heading of any level.** So a section does not contain its subsections, and editing a child never marks its parent `modified`. The document title is a section like any other.
 
@@ -781,16 +784,17 @@ A named checkpoint of an unchanged document mints a row whose bytes duplicate it
 
 **The tree is in head order.** Each `removed` section is emitted just after the last head section that did pair, and removals with nothing before them come first. A `removed` node carries the **baseline's** level and text, so it can nest under a head section by that older level.
 
-`excerpt` is not verbatim. Whitespace collapses to single spaces, C0 and C1 control characters are stripped, and the result is cut at 140 characters. Both caps exist because this text is meant for an email body, where a newline forges a whole entry. No mailer consumes it yet — that is issue #201.
+`excerpt` is not verbatim. Whitespace collapses to single spaces, C0 and C1 control characters are stripped, and the result is cut at 140 characters. Both caps exist because this text is meant for an email body, where a newline forges a whole entry. The Change digest paints `runs` when they exist. It paints `excerpt` or `removedExcerpt` when they do not.
 
 ### Section status
 
-| `status`    | When                                                 | `magnitude`                                                          |
-| ----------- | ---------------------------------------------------- | -------------------------------------------------------------------- |
-| `added`     | The section has no baseline side                     | Every word and block in it, counted as added                         |
-| `removed`   | The section has no head side                         | Every word and block in it, counted as removed. No `excerpt`         |
-| `modified`  | Both sides exist and their canonical forms differ    | Word deltas plus the block count on each side, or `null` — see below |
-| `unchanged` | Both sides exist and their canonical forms are equal | Always `null`. An unchanged pair is never measured                   |
+| `status`    | When                                                                                                       | `magnitude`                                                                                 |
+| ----------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `added`     | The section has no baseline side                                                                           | Every word and block in it, counted as added                                                |
+| `removed`   | The section has no head side                                                                               | Every word and block in it, counted as removed. The body is `removedExcerpt`, not `excerpt` |
+| `modified`  | Both sides exist and their canonical forms differ                                                          | Word deltas plus the block count on each side, or `null` — see below                        |
+| `moved`     | Both sides exist, the canonical forms are equal, and the shared toc-id sits outside one common subsequence | Always `null`                                                                               |
+| `unchanged` | Both sides exist and their canonical forms are equal                                                       | Always `null`. An unchanged pair is never measured                                          |
 
 The canonical form covers the heading node and the body together. So a heading level change from 2 to 3 stays visible, even when both node lists are otherwise identical. It drops the `toc-id` attribute, because the editor stamps that on first open and it is churn, not an edit.
 
@@ -803,7 +807,7 @@ The `excerpt` on a `modified` section is the single widest inserted run, not eve
 Identity is resolved in four steps, in this order.
 
 1. **The preamble, by position.** When both sides open with a `level: 0` preamble, those two pair. A preamble carries no `toc-id` and no name, so position is its only identity.
-2. **By `toc-id`.** Both sides must carry one. Inside each snapshot the first occurrence wins, so a duplicate id falls through to the next step. A stable id beats position, which is what lets a moved section still read as `unchanged`.
+2. **By `toc-id`.** Both sides must carry one. Inside each snapshot the first occurrence wins, so a duplicate id falls through to the next step. A stable id beats position. A reorder that keeps the text and the toc-id is `moved`. A toc-id rewrite that keeps the canonical form stays `unchanged`.
 3. **By longest common subsequence, as `unchanged`.** The key is the canonical hash of the whole section. An unstamped baseline section still matches a freshly stamped head section here, because the canonical form drops `toc-id`. That is what stops the editor's first-open pass reading as a whole new document.
 4. **By longest common subsequence, as `modified`.** A leftover removal is zipped with a leftover addition under two conditions. The two levels must be equal, and at least one of the two ids must be `null`.
 

@@ -16,7 +16,7 @@ import type {
 } from '../types'
 import { buildSectionTree } from './buildSectionTree'
 import { diffSections } from './diffSections'
-import { pairSections } from './pairSections'
+import { movedTocIds, pairSections } from './pairSections'
 import { segmentSections } from './segmentSections'
 
 /** A factory, not a constant: a shared `triggers` or `contributors` array that one
@@ -25,6 +25,7 @@ const emptySummary = (): ChangeSummary => ({
   sectionsAdded: 0,
   sectionsRemoved: 0,
   sectionsModified: 0,
+  sectionsMoved: 0,
   wordsAdded: 0,
   wordsRemoved: 0,
   versions: 0,
@@ -39,7 +40,11 @@ const emptySummary = (): ChangeSummary => ({
  * digest then mails "0 sections changed".
  */
 const anyChanged = (summary: ChangeSummary): boolean =>
-  summary.sectionsAdded + summary.sectionsRemoved + summary.sectionsModified > 0
+  summary.sectionsAdded +
+    summary.sectionsRemoved +
+    summary.sectionsModified +
+    summary.sectionsMoved >
+  0
 
 const rollUp = (sections: SectionChange[], window: ChangeSummary): ChangeSummary => {
   const summary = { ...window }
@@ -47,6 +52,7 @@ const rollUp = (sections: SectionChange[], window: ChangeSummary): ChangeSummary
     if (section.status === 'added') summary.sectionsAdded += 1
     else if (section.status === 'removed') summary.sectionsRemoved += 1
     else if (section.status === 'modified') summary.sectionsModified += 1
+    else if (section.status === 'moved') summary.sectionsMoved += 1
     summary.wordsAdded += section.magnitude?.wordsAdded ?? 0
     summary.wordsRemoved += section.magnitude?.wordsRemoved ?? 0
   }
@@ -55,8 +61,7 @@ const rollUp = (sections: SectionChange[], window: ChangeSummary): ChangeSummary
 
 /**
  * Read-only compute over two stored snapshots. The deps are a subset with no auth
- * middleware, so a separate process can import this factory by deep path instead
- * of calling the route. Nothing does today; the digest worker is issue #201.
+ * middleware, so the digest worker imports this factory by deep path.
  */
 export const createComputeDocumentChanges = (deps: ComputeDeps): ComputeDocumentChanges => {
   const store = createChangesStore(deps.prisma)
@@ -168,10 +173,13 @@ export const createComputeDocumentChanges = (deps: ComputeDeps): ComputeDocument
       baselineSections = segmentSections(baselineJson.content as TiptapDocJson)
     }
 
+    const headSections = segmentSections(headJson.content as TiptapDocJson)
+    const pairs = pairSections(baselineSections, headSections)
     const sections = diffSections(
-      pairSections(baselineSections, segmentSections(headJson.content as TiptapDocJson)),
+      pairs,
       (error, tocId) =>
-        deps.logger.debug({ err: error, documentId, tocId }, 'Section magnitude failed')
+        deps.logger.debug({ err: error, documentId, tocId }, 'Section magnitude failed'),
+      movedTocIds(baselineSections, pairs)
     )
     return respond('computed', anchors, summary, sections)
   }

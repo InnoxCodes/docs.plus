@@ -2,13 +2,16 @@ import { describe, expect, test } from 'bun:test'
 
 import type { TiptapDocJson } from '../../../document-content/types'
 import { diffSections } from '../../domain/diffSections'
-import { pairSections } from '../../domain/pairSections'
+import { movedTocIds, pairSections } from '../../domain/pairSections'
 import { segmentSections } from '../../domain/segmentSections'
 import { EXCERPT_MAX_CHARS } from '../../types'
 import { BOLD, doc, heading, link, para, text } from '../fixtures'
 
-const changesOf = (before: TiptapDocJson, after: TiptapDocJson) =>
-  diffSections(pairSections(segmentSections(before), segmentSections(after)))
+const changesOf = (before: TiptapDocJson, after: TiptapDocJson) => {
+  const baseline = segmentSections(before)
+  const pairs = pairSections(baseline, segmentSections(after))
+  return diffSections(pairs, undefined, movedTocIds(baseline, pairs))
+}
 
 // The changeset's default token encoder keys a character on its code and a node
 // on its type name, so it reads neither marks nor attributes. Each edit below is
@@ -91,6 +94,40 @@ describe('diffSections', () => {
       doc(heading(1, 'Title', 't1'), para(text('body')), para(text('real\nForged entry')))
     )
     expect(section.excerpt).toBe('real Forged entry')
+  })
+
+  test('a changed sentence keeps the new words and the old words', () => {
+    const [section] = changesOf(
+      doc(heading(1, 'Title', 't1'), para(text('alpha'))),
+      doc(heading(1, 'Title', 't1'), para(text('beta')))
+    ).filter((row) => row.status === 'modified')
+    expect(section.excerpt).toBe('beta')
+    expect(section.removedExcerpt).toBe('alpha')
+    expect(section.runs).toEqual(
+      expect.arrayContaining([
+        { kind: 'removed', text: 'alpha' },
+        { kind: 'added', text: 'beta' }
+      ])
+    )
+  })
+
+  test('a pure reorder is moved', () => {
+    const changes = changesOf(
+      doc(heading(1, 'A', 'a1'), heading(1, 'B', 'b1')),
+      doc(heading(1, 'B', 'b1'), heading(1, 'A', 'a1'))
+    )
+    expect(changes.find((section) => section.text === 'A')?.status).toBe('moved')
+    expect(changes.find((section) => section.text === 'B')?.status).toBe('unchanged')
+  })
+
+  test('an insertion does not mark the later sections moved', () => {
+    const changes = changesOf(
+      doc(heading(1, 'A', 'a1'), heading(1, 'B', 'b1')),
+      doc(heading(1, 'New', 'n1'), heading(1, 'A', 'a1'), heading(1, 'B', 'b1'))
+    )
+    expect(changes.find((section) => section.text === 'New')?.status).toBe('added')
+    expect(changes.find((section) => section.text === 'A')?.status).toBe('unchanged')
+    expect(changes.find((section) => section.text === 'B')?.status).toBe('unchanged')
   })
 
   test('caps the excerpt', () => {

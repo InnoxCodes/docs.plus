@@ -6,6 +6,7 @@
  */
 
 import { APP_NAME, APP_URL, COLORS, FONT_STACK, RADIUS, SPACING } from './tokens'
+import type { DigestChangeRun } from './types'
 
 // Every avatar source is user-writable: `users.avatar_url` allows any
 // non-whitespace string, and `raw_user_meta_data.avatar_url` is unconstrained.
@@ -137,16 +138,25 @@ export function changeWindowLine(
   now?: number | string
 ): string {
   const startedAt = Date.parse(since)
-  // A carrier timestamp can be unparseable, and the seed keeps it on purpose,
-  // so "NaN minutes ago" would ship. The frequency line reads no `since`.
-  if (!fromLastLeft || Number.isNaN(startedAt)) {
-    return frequency === 'weekly' ? '✏️ Changed in the last week.' : '✏️ Changed in the last day.'
-  }
-  // Anchor on the window's own end, which both surfaces pass as `periodEnd`. A
-  // digest renders from a queued payload, so wall clock at render can sit well
-  // past the instant the sections were computed for, and the two would disagree.
   const anchor = typeof now === 'string' ? Date.parse(now) : now
   const endedAt = anchor === undefined || Number.isNaN(anchor) ? Date.now() : anchor
+  const frequencyLine =
+    frequency === 'weekly' ? '✏️ Changed in the last week.' : '✏️ Changed in the last day.'
+  // A carrier timestamp can be unparseable, and the seed keeps it on purpose,
+  // so "NaN minutes ago" would ship. The frequency line reads no `since`.
+  if (Number.isNaN(startedAt)) return frequencyLine
+  const frequencyMs = frequency === 'weekly' ? 7 * DAY_MS : DAY_MS
+  // Retention clamps a very old Last left. The sections then cover that wider
+  // window, so "in the last day" would be false, and "since you left" would too.
+  if (!fromLastLeft && endedAt - startedAt > frequencyMs + MINUTE_MS) {
+    return `✏️ Changed since ${new Date(startedAt).toLocaleDateString('en-GB', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      timeZone: 'UTC'
+    })}.`
+  }
+  if (!fromLastLeft) return frequencyLine
   return `✏️ Changed since you left, ${formatAgo(startedAt, endedAt)}.`
 }
 
@@ -170,6 +180,15 @@ export function digestNotificationsUrl(documents: ReadonlyArray<{ url: string }>
   const first = documents[0]?.url
   if (!first) return APP_URL
   return `${first.split('#')[0]}#notifications`
+}
+
+/** Mail cannot mix colours, so the wash is a fixed hex close to the History ground. */
+export function changeRunStyle(kind: DigestChangeRun['kind']): string {
+  if (kind === 'added') return `background-color:${COLORS.addedWash};border-radius:2px;`
+  if (kind === 'removed') {
+    return `background-color:${COLORS.removedWash};color:${COLORS.textMuted};text-decoration:line-through;border-radius:2px;`
+  }
+  return ''
 }
 
 export function truncate(text: string, maxLength: number): string {
@@ -198,6 +217,7 @@ export const templateHelpers = {
   footerLinksText,
   changeWindowLine,
   contributorLine,
+  changeRunStyle,
   truncate,
   COLORS,
   FONT_STACK,

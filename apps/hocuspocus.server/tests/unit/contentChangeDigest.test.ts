@@ -13,7 +13,7 @@ import {
   flattenChangedSections,
   resolveDigestSince
 } from '../../src/lib/email/digestContentChanges'
-import { filterDigestDocuments } from '../../src/lib/email/digestDocuments'
+import { filterDigestDocuments, groupDigestDocuments } from '../../src/lib/email/digestDocuments'
 import type { ComputeOutcome, SectionNode } from '../../src/modules/document-changes/types'
 import type { DigestDocument } from '../../src/types/email.types'
 
@@ -100,6 +100,7 @@ const changesResult = (
       sectionsAdded: 0,
       sectionsRemoved: 0,
       sectionsModified: 1,
+      sectionsMoved: 0,
       wordsAdded: 3,
       wordsRemoved: 0,
       versions: 1,
@@ -125,7 +126,7 @@ const silentLogger = {
 const enrichDeps = (over: Record<string, unknown> = {}) => ({
   computeChanges: async () => changesResult(),
   readMetadata: async () => ({ title: 'API docs', slug: 'api-docs' }),
-  readLastVisit: async () => null,
+  readLastVisits: async (_reader: string, ids: string[]) => new Map(ids.map((id) => [id, null])),
   logger: silentLogger,
   recipientId: OWNER,
   frequency: 'daily' as const,
@@ -133,6 +134,16 @@ const enrichDeps = (over: Record<string, unknown> = {}) => ({
   retentionDays: 30,
   appUrl: 'https://docs.plus',
   ...over
+})
+
+describe('groupDigestDocuments', () => {
+  const docs = [changedDoc(), { ...changedDoc(), slug: 'second', name: 'Second' }]
+
+  it('sends one mail per document unless an admin combines them', () => {
+    expect(groupDigestDocuments(docs, 'document')).toEqual([[docs[0]], [docs[1]]])
+    expect(groupDigestDocuments(docs, 'aggregate')).toEqual([docs])
+    expect(groupDigestDocuments([docs[0]!], 'document')).toEqual([[docs[0]]])
+  })
 })
 
 describe('resolveContentChangeAudience', () => {
@@ -286,19 +297,13 @@ describe('flattenChangedSections', () => {
 
   // The trap: an unchanged heading must still parent its changed child, or that
   // child loses its breadcrumb and reads as a root.
-  it('names the two deepest ancestors of a change under an unchanged heading', () => {
-    const rows = flattenChangedSections(tree(), DOC_URL)
-    // Three ancestors deep, so "two deepest" cannot pass as "two shallowest".
-    expect(rows[0]!.breadcrumb).toEqual(['Beta', 'Gamma'])
-    expect(rows[0]!.breadcrumb).not.toContain('Alpha')
-    expect(rows[1]!.breadcrumb).toEqual(['Alpha'])
-  })
-
   // A toc id is stranger-written on a public document, so it is encoded.
   it('encodes the toc id into the link and falls back to the document url', () => {
     const rows = flattenChangedSections(tree(), DOC_URL)
     expect(rows[0]!.url).toBe(`${DOC_URL}?id=deep%20id%261`)
+    expect(rows[0]!.tocId).toBe('deep id&1')
     expect(rows[1]!.url).toBe(DOC_URL)
+    expect(rows[1]!.tocId).toBeUndefined()
   })
 })
 
@@ -382,7 +387,8 @@ describe('enrichDigestDocuments', () => {
       [enrichableDoc()],
       enrichDeps({
         computeChanges: changed,
-        readLastVisit: async () => new Date(NOW.getTime() - 17 * 60 * 1000)
+        readLastVisits: async (_reader: string, ids: string[]) =>
+          new Map(ids.map((id) => [id, new Date(NOW.getTime() - 17 * 60 * 1000)]))
       })
     )
     expect(after!.content_changes?.fromLastLeft).toBe(true)
@@ -396,7 +402,8 @@ describe('enrichDigestDocuments', () => {
       enrichDeps({
         computeChanges: async () =>
           changesResult({ sections: [section({ text: 'Intro', tocId: 'intro' })] }),
-        readLastVisit: async () => new Date(NOW.getTime() - 120 * DAY)
+        readLastVisits: async (_reader: string, ids: string[]) =>
+          new Map(ids.map((id) => [id, new Date(NOW.getTime() - 120 * DAY)]))
       })
     )
     expect(doc!.content_changes?.fromLastLeft).toBe(false)
@@ -417,17 +424,68 @@ describe('enrichDigestDocuments', () => {
     }
   })
 
-  it('caps the list at eight rows and carries the rest as a count', async () => {
-    const nine = Array.from({ length: 9 }, (_, index) =>
+  it('keeps every changed heading and lets the mail size decide the cut', async () => {
+    const many = Array.from({ length: 25 }, (_, index) =>
       section({ text: `Section ${index + 1}`, tocId: `h${index + 1}` })
     )
     const [doc] = await enrichDigestDocuments(
       [enrichableDoc()],
-      enrichDeps({ computeChanges: async () => changesResult({ sections: nine }) })
+      enrichDeps({ computeChanges: async () => changesResult({ sections: many }) })
     )
-    expect(doc!.content_changes?.sections).toHaveLength(8)
-    expect(doc!.content_changes?.moreCount).toBe(1)
-    expect(doc!.content_changes?.sections?.at(-1)?.text).toBe('Section 8')
+    expect(doc!.content_changes?.sections).toHaveLength(25)
+    expect(doc!.content_changes?.moreCount).toBeUndefined()
+  })
+
+  it('puts a heading chat under that heading and drops the channel card', async () => {
+    const docIn = enrichableDoc()
+    docIn.channels = [
+      {
+        name: 'Intro',
+        id: 'intro',
+        url: `${DOC_URL}?chatroom=intro`,
+        notifications: [
+          {
+            type: 'message',
+            sender_name: 'Lena',
+            message_preview: 'The second click should close it.',
+            action_url: `${DOC_URL}?chatroom=intro`,
+            created_at: '2026-09-21T09:14:00.000Z'
+          }
+        ]
+      },
+      {
+        name: 'general',
+        id: 'room-general',
+        url: `${DOC_URL}?chatroom=room-general`,
+        notifications: [
+          {
+            type: 'mention',
+            sender_name: 'John',
+            message_preview: 'Review the auth section',
+            action_url: `${DOC_URL}?chatroom=room-general`,
+            created_at: '2026-09-21T10:00:00.000Z'
+          }
+        ]
+      }
+    ]
+    const [doc] = await enrichDigestDocuments(
+      [docIn],
+      enrichDeps({
+        computeChanges: async () =>
+          changesResult({
+            sections: [
+              section({ text: 'Quiet', tocId: 'quiet', status: 'unchanged' }),
+              section({ text: 'Intro', tocId: 'intro' })
+            ]
+          })
+      })
+    )
+    const intro = doc!.content_changes?.sections?.find((row) => row.text === 'Intro')
+    expect(intro?.chats).toEqual([
+      { at: '2026-09-21 09:14', sender: 'Lena', text: 'The second click should close it.' }
+    ])
+    expect(doc!.channels.map((channel) => channel.id)).toEqual(['room-general'])
+    expect(doc!.content_changes?.sections?.some((row) => row.text === 'Quiet')).toBe(false)
 
     const { html } = buildDigestEmail({
       recipientName: 'Ada',
@@ -435,17 +493,13 @@ describe('enrichDigestDocuments', () => {
       documents: [doc!],
       periodEnd: '2026-09-03T00:00:00.000Z'
     })
-    expect(html).toContain('+1 more')
-    // The plaintext overflow follows its own surroundings, where the channel cap
-    // already reads "...and N more", so both house wordings are accepted.
-    expect(
-      buildDigestEmail({
-        recipientName: 'Ada',
-        frequency: 'daily',
-        documents: [doc!],
-        periodEnd: '2026-09-03T00:00:00.000Z'
-      }).text
-    ).toMatch(/(\+1 more|and 1 more)/)
+    const introAt = html.indexOf('>Intro<')
+    const chatAt = html.indexOf('The second click should close it.')
+    const cardAt = html.indexOf('# general')
+    expect(introAt).toBeGreaterThan(-1)
+    expect(chatAt).toBeGreaterThan(introAt)
+    expect(cardAt).toBeGreaterThan(chatAt)
+    expect(html).toContain('Review the auth section')
   })
 })
 

@@ -22,7 +22,10 @@ export const COLORS = {
 
   // Status (only used in unsubscribe page)
   success: '#10b981', // emerald-500
-  error: '#ef4444' // red-500
+  error: '#ef4444', // red-500
+  // History compare uses a light wash. Mail cannot mix colours, so these are the washes.
+  addedWash: '#d1fae5',
+  removedWash: '#fee2e2'
 } as const
 
 export const SPACING = {

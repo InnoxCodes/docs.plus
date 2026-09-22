@@ -3,6 +3,7 @@ import { describe, expect, it } from 'bun:test'
 import type { DigestDocument } from '../types'
 import {
   buildDigestEmail,
+  fitDigestDocuments,
   buildListUnsubscribeHeaders,
   buildNotificationEmailText,
   getEmailSubject,
@@ -73,7 +74,6 @@ const DIGEST_CHANGES_PARAMS = {
         sections: [
           {
             text: 'Rate limiting',
-            breadcrumb: ['API Documentation', 'Auth'],
             url: 'https://docs.plus/api-docs?id=rate-limiting'
           }
         ],
@@ -180,12 +180,169 @@ describe('buildDigestEmail', () => {
     expect(html).toMatchSnapshot()
   })
 
+  it('shows the added and removed words under a heading that opens that place', () => {
+    const { html, text } = buildDigestEmail({
+      ...DIGEST_CHANGES_PARAMS,
+      documents: [
+        {
+          ...DIGEST_CHANGES_PARAMS.documents[0],
+          content_changes: {
+            ...DIGEST_CHANGES_PARAMS.documents[0].content_changes,
+            sections: [
+              {
+                ...DIGEST_CHANGES_PARAMS.documents[0].content_changes.sections[0],
+                excerpt: 'Requests over the cap wait.',
+                removed: 'Requests over the cap fail.',
+                tocId: 'rate-limiting'
+              }
+            ]
+          }
+        }
+      ]
+    })
+    expect(html).toContain('Requests over the cap wait.')
+    expect(html).toContain('Requests over the cap fail.')
+    expect(html).toContain('https://docs.plus/api-docs?id=rate-limiting')
+    expect(html).toContain('font-weight: 700')
+    expect(text).toContain('+ Requests over the cap wait.')
+    expect(text).toContain('- Requests over the cap fail.')
+    expect(text).toContain('https://docs.plus/api-docs?id=rate-limiting')
+  })
+
+  it('paints the changed passage under the heading', () => {
+    const { html, text } = buildDigestEmail({
+      ...DIGEST_CHANGES_PARAMS,
+      documents: [
+        {
+          ...DIGEST_CHANGES_PARAMS.documents[0],
+          content_changes: {
+            ...DIGEST_CHANGES_PARAMS.documents[0].content_changes,
+            sections: [
+              {
+                ...DIGEST_CHANGES_PARAMS.documents[0].content_changes.sections[0],
+                tocId: 'rate-limiting',
+                chats: [
+                  {
+                    at: '2026-02-16 10:00',
+                    sender: 'Alice',
+                    text: 'The cap should wait, not fail.'
+                  }
+                ],
+                runs: [
+                  { kind: 'same', text: 'Requests over the cap ' },
+                  { kind: 'removed', text: 'fail' },
+                  { kind: 'added', text: ' wait' },
+                  {
+                    kind: 'same',
+                    text: '. Later retries use the same key and stay in the queue until a slot opens.'
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    })
+    expect(html).toContain('Requests over the cap')
+    expect(html).toContain('background-color:#fee2e2')
+    expect(html).toContain('background-color:#d1fae5')
+    expect(html).not.toContain('<details>')
+    expect(html).toContain('Later retries use the same key')
+    expect(html).toContain('https://docs.plus/api-docs?id=rate-limiting')
+    expect(html).toContain('Alice')
+    expect(html).toContain('The cap should wait, not fail.')
+    expect(text).toContain('Requests over the cap fail wait.')
+    expect(text).toContain('Alice: The cap should wait, not fail.')
+    expect(text).toContain('Later retries use the same key')
+    expect(text).not.toContain('More:')
+  })
+
+  it('drops the oldest chat before it shortens a changed heading', () => {
+    const documents = [
+      {
+        name: 'Pad',
+        slug: 'pad',
+        url: 'https://docs.plus/pad',
+        channels: [
+          {
+            name: 'general',
+            id: 'room-general',
+            url: 'https://docs.plus/pad?chatroom=room-general',
+            notifications: [
+              {
+                type: 'message' as const,
+                sender_name: 'Ann',
+                message_preview: 'stay in the card',
+                action_url: 'https://docs.plus/pad?chatroom=room-general',
+                created_at: '2026-09-01T00:00:00.000Z'
+              }
+            ]
+          }
+        ],
+        content_changes: {
+          document_id: 'pad',
+          since: '2026-09-01T00:00:00.000Z',
+          fromLastLeft: false,
+          sections: [
+            {
+              text: 'Bugs',
+              url: 'https://docs.plus/pad?id=bugs',
+              runs: [
+                {
+                  kind: 'same' as const,
+                  text: `${'word '.repeat(800)}The edit stays. The rest of this passage is only context.`
+                }
+              ],
+              chats: [
+                { at: '2026-09-01 01:00', sender: 'Old', text: 'oldest chat should go' },
+                { at: '2026-09-02 01:00', sender: 'New', text: 'newer chat stays if it fits' }
+              ]
+            }
+          ]
+        }
+      }
+    ] satisfies DigestDocument[]
+    const params = {
+      recipientName: 'Ada',
+      frequency: 'daily' as const,
+      documents,
+      periodEnd: '2026-09-03T00:00:00.000Z'
+    }
+    const full = buildDigestEmail(params)
+    const limit = Buffer.byteLength(full.html, 'utf8') - 1
+    const fitted = fitDigestDocuments(params, limit)
+    const { html } = buildDigestEmail({ ...params, documents: fitted })
+    expect(html).toContain('Bugs')
+    expect(html).not.toContain('oldest chat should go')
+    expect(html).toContain('stay in the card')
+    expect(Buffer.byteLength(html, 'utf8')).toBeLessThanOrEqual(limit)
+  })
+
   it('names Last left in the changed-document line', () => {
     const { html } = buildDigestEmail(DIGEST_CHANGES_PARAMS)
     // The fixture's `since` and `periodEnd` are one day apart, so this value is
     // fixed. It read "on 16 Feb 2026" while the render anchored on wall clock,
     // which made the assertion drift with the calendar.
     expect(html).toContain('Changed since you left, 1 day ago.')
+  })
+
+  it('names the resolved start when the window is wider than the frequency', () => {
+    const { html } = buildDigestEmail({
+      ...DIGEST_CHANGES_PARAMS,
+      documents: [
+        {
+          ...DIGEST_CHANGES_PARAMS.documents[0],
+          content_changes: {
+            ...DIGEST_CHANGES_PARAMS.documents[0].content_changes,
+            since: '2026-01-01T00:00:00Z',
+            fromLastLeft: false
+          }
+        }
+      ]
+    })
+    expect(html).toContain('Changed since 1 Jan 2026.')
+    expect(html).not.toContain('since you left')
+    expect(html).not.toContain('in the last day')
   })
 
   it('falls back to the frequency window when the reader never left', () => {

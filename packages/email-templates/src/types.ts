@@ -37,13 +37,29 @@ export interface DigestChannel {
   notifications: DigestNotification[]
 }
 
+export interface DigestChangeRun {
+  kind: 'same' | 'added' | 'removed'
+  text: string
+}
+
+export interface DigestHeadingChat {
+  /** Already formatted, for example `2025-07-09 19:54`. */
+  at: string
+  sender: string
+  text: string
+}
+
 export interface DigestChangedSection {
   /** Heading text. Compute already sanitised and capped it. */
   text: string
-  /** The two deepest ancestor headings, outermost first. Empty at the root. */
-  breadcrumb: string[]
   /** `${docUrl}?id=<tocId>`, or docUrl for the root and for a removed section. */
   url: string
+  excerpt?: string
+  removed?: string
+  runs?: DigestChangeRun[]
+  /** Absent when the section was removed and has nothing to open. */
+  tocId?: string
+  chats?: DigestHeadingChat[]
 }
 
 /**
@@ -60,9 +76,9 @@ export interface DigestContentChanges {
    * "since you left" to a reader who never left. The carrier seed is false.
    */
   fromLastLeft: boolean
-  /** Changed sections in document order, capped by the enrichment. */
+  /** Changed sections in document order. */
   sections?: DigestChangedSection[]
-  /** Sections the cap cut. Absent when nothing was cut. */
+  /** Leftover count from a payload. Enrichment does not set it. */
   moreCount?: number
   /** People named in the window. A floor, never a census. Absent when none resolved. */
   contributorCount?: number

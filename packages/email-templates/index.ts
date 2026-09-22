@@ -13,6 +13,7 @@ export {
 } from './src/engine'
 export type { EmailFooter } from './src/helpers'
 export type { DigestEmail } from './src/templates'
+export { DEFAULT_DIGEST_MAX_BYTES, fitDigestDocuments } from './src/digestFit'
 export {
   buildDigestEmail,
   buildNewDocumentEmailText,
@@ -21,7 +22,9 @@ export {
 export { APP_NAME, APP_URL, COLORS, FONT_STACK, RADIUS, SPACING } from './src/tokens'
 export type {
   DigestChangedSection,
+  DigestChangeRun,
   DigestChannel,
+  DigestHeadingChat,
   DigestContentChanges,
   DigestDocument,
   DigestFrequency,

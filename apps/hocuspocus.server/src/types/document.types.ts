@@ -54,5 +54,9 @@ export interface HistoryPayload {
   type: string
   documentId: string
   version?: number
+  /** Older-page cursor. Absent on the first page. */
+  beforeVersion?: number
+  /** ISO instant. The first page also includes the row at or before this. */
+  since?: string
   msg?: string
 }

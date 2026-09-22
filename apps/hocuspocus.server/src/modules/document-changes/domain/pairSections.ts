@@ -100,3 +100,60 @@ export const pairSections = (baseline: Section[], head: Section[]): SectionPair[
 
   return pairs
 }
+
+/**
+ * Sections that kept their text and their toc-id, but not their place.
+ * Index equality would call every later section moved after one insertion.
+ * The ids outside one common subsequence are the ones that moved.
+ */
+export function movedTocIds(baseline: Section[], pairs: SectionPair[]): ReadonlySet<string> {
+  const same = pairs.filter(
+    (pair): pair is { baseline: Section; head: Section } =>
+      pair.baseline !== null &&
+      pair.head !== null &&
+      pair.baseline.tocId !== null &&
+      pair.baseline.tocId === pair.head.tocId &&
+      canonicalSection(pair.baseline) === canonicalSection(pair.head)
+  )
+  const beforeIds = [...same]
+    .sort((a, b) => baseline.indexOf(a.baseline) - baseline.indexOf(b.baseline))
+    .map((pair) => pair.baseline.tocId as string)
+  const afterIds = same.map((pair) => pair.head.tocId as string)
+  return idsOutsideLcs(beforeIds, afterIds)
+}
+
+function idsOutsideLcs(before: string[], after: string[]): Set<string> {
+  const n = before.length
+  const m = after.length
+  const width = m + 1
+  const dp = new Int32Array((n + 1) * width)
+
+  for (let i = n - 1; i >= 0; i -= 1) {
+    for (let j = m - 1; j >= 0; j -= 1) {
+      dp[i * width + j] =
+        before[i] === after[j]
+          ? dp[(i + 1) * width + j + 1] + 1
+          : Math.max(dp[(i + 1) * width + j], dp[i * width + j + 1])
+    }
+  }
+
+  const kept = new Set<string>()
+  let i = 0
+  let j = 0
+  while (i < n && j < m) {
+    if (before[i] === after[j]) {
+      kept.add(before[i])
+      i += 1
+      j += 1
+    } else if (dp[(i + 1) * width + j] >= dp[i * width + j + 1]) {
+      i += 1
+    } else {
+      j += 1
+    }
+  }
+
+  const moved = new Set<string>()
+  for (const id of before) if (!kept.has(id)) moved.add(id)
+  for (const id of after) if (!kept.has(id)) moved.add(id)
+  return moved
+}

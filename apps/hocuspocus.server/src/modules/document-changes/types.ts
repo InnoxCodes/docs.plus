@@ -12,7 +12,7 @@ export const EXCERPT_MAX_CHARS = 140
 /** Heading text, capped for the same reason as the excerpt — it also rides an email. */
 export const SECTION_TEXT_MAX_CHARS = 200
 
-export type SectionStatus = 'added' | 'removed' | 'modified' | 'unchanged'
+export type SectionStatus = 'added' | 'removed' | 'modified' | 'moved' | 'unchanged'
 
 export type ChangesScope = 'summary' | 'headings'
 
@@ -42,6 +42,11 @@ export type SectionPair =
   | { baseline: Section; head: null }
   | { baseline: null; head: Section }
 
+export interface SectionChangeRun {
+  kind: 'same' | 'added' | 'removed'
+  text: string
+}
+
 export interface SectionChange {
   tocId: string | null
   text: string
@@ -50,6 +55,8 @@ export interface SectionChange {
   /** Null when nothing countable moved — a formatting-only edit, or a throw. */
   magnitude: SectionMagnitude | null
   excerpt?: string
+  removedExcerpt?: string
+  runs?: SectionChangeRun[]
 }
 
 export interface SectionNode extends SectionChange {
@@ -60,6 +67,7 @@ export interface ChangeSummary {
   sectionsAdded: number
   sectionsRemoved: number
   sectionsModified: number
+  sectionsMoved: number
   wordsAdded: number
   wordsRemoved: number
   versions: number
