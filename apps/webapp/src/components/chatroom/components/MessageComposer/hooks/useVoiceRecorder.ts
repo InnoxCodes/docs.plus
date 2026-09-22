@@ -60,6 +60,8 @@ export function useVoiceRecorder({
   // A release or a cleanup during the microphone request changes this id.
   // The pending start then stops its stream and does not record.
   const startIdRef = useRef(0)
+  // A tap, or a permission prompt that takes the touch, ends the hold before the microphone answers.
+  const releasedEarlyRef = useRef(false)
 
   // Held or locked. Preview, cancel, and the 5-minute cap all leave this phase.
   useEffect(() => {
@@ -193,11 +195,15 @@ export function useVoiceRecorder({
       anchorRef.current = { x: clientX, y: clientY }
       resetGesture()
       const startId = ++startIdRef.current
+      releasedEarlyRef.current = false
 
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
         if (startId !== startIdRef.current) {
           stream.getTracks().forEach((track) => track.stop())
+          if (releasedEarlyRef.current) {
+            toast.Info('Hold the mic to record a voice note', { id: 'voice-hold-hint' })
+          }
           return
         }
         streamRef.current = stream
@@ -302,7 +308,10 @@ export function useVoiceRecorder({
 
   const endHold = useCallback(() => {
     startIdRef.current++
-    if (recorderRef.current?.state !== 'recording') return
+    if (recorderRef.current?.state !== 'recording') {
+      releasedEarlyRef.current = true
+      return
+    }
     if (isLockedRef.current) return
     if (isCancelArmedRef.current) {
       cancelRecording()
