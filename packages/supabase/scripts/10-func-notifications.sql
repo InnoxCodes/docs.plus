@@ -1,6 +1,10 @@
 -- Fan-out triggers for message-driven notifications (mentions, @everyone,
 -- replies, reactions, regular sends) and unread-count maintenance.
 
+-- One @ token rule serves the mention, @everyone and regular-message fan-outs.
+-- A token is @ plus the longest run of [A-Za-z0-9_-]. The @ is at the start or
+-- after a character outside that set. It names a user only on an exact match.
+
 -- Fans out one notification per channel member mentioned by @username.
 CREATE OR REPLACE FUNCTION create_mention_notifications()
 RETURNS TRIGGER
@@ -9,7 +13,6 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-    mentioned_user_id UUID;
     is_channel_muted BOOLEAN;
     truncated_content TEXT;
 BEGIN
@@ -42,45 +45,35 @@ BEGIN
     -- 3) Truncate message content for preview
     truncated_content := message_content_preview(NEW.content, NEW.medias, NEW.type);
 
-    -- 4) For each mentioned username, attempt to create a notification.
-    --    Anchored regex prevents `@al` from matching `alice`/`alpha`.
-    --    Usernames are validated as `^[a-z][a-z0-9_-]{2,29}$` at the
-    --    table level, so concatenating into the pattern is safe.
-    FOR mentioned_user_id IN
-        SELECT u.id
-          FROM public.users u
-         WHERE NEW.content ~ ('(^|[^a-z0-9_-])@' || u.username || '($|[^a-z0-9_-])')
-    LOOP
-        -- Check membership in the channel AND notification settings
-        IF EXISTS (
-            SELECT 1
-              FROM public.channel_members
-             WHERE channel_id = NEW.channel_id
-               AND member_id  = mentioned_user_id
-               AND mute_in_app_notifications = false
-               AND notif_state != 'MUTED'
-        ) THEN
-            -- Insert the mention notification
-            INSERT INTO public.notifications (
-                receiver_user_id,
-                sender_user_id,
-                type,
-                message_id,
-                channel_id,
-                message_preview,
-                created_at
-            )
-            VALUES (
-                mentioned_user_id,
-                NEW.user_id,
-                'mention',
-                NEW.id,
-                NEW.channel_id,
-                truncated_content,
-                timezone('utc', now())
-            );
-        END IF;
-    END LOOP;
+    -- 4) One row per distinct token that names a member who has not muted.
+    --    `everyone` belongs to create_everyone_notifications, never to a user.
+    INSERT INTO public.notifications (
+        receiver_user_id,
+        sender_user_id,
+        type,
+        message_id,
+        channel_id,
+        message_preview,
+        created_at
+    )
+    SELECT
+        u.id,
+        NEW.user_id,
+        'mention',
+        NEW.id,
+        NEW.channel_id,
+        truncated_content,
+        timezone('utc', now())
+    FROM (
+        SELECT DISTINCT token_match[1] AS username
+          FROM regexp_matches(NEW.content, '(?:^|[^A-Za-z0-9_-])@([A-Za-z0-9_-]+)', 'g') AS token_match
+    ) AS tokens
+    JOIN public.users u ON u.username = tokens.username
+    JOIN public.channel_members cm ON cm.member_id = u.id AND cm.channel_id = NEW.channel_id
+    WHERE tokens.username <> 'everyone'
+      AND u.id <> NEW.user_id
+      AND cm.mute_in_app_notifications = false
+      AND cm.notif_state <> 'MUTED';
 
     RETURN NEW;
 END;
@@ -220,39 +213,35 @@ BEGIN
     -- 3) Truncate message content for preview
     truncated_content := message_content_preview(NEW.content, NEW.medias, NEW.type);
 
-    -- 4) Check for an actual @everyone token (not a substring inside
-    --    something like `@everyone_team`).
-    IF NEW.content ~ '(^|[^a-z0-9_-])@everyone($|[^a-z0-9_-])' THEN
-        -- 5) Loop over channel members (excluding sender) who have not muted notifications
-        FOR channel_member_id IN
-            SELECT cm.member_id
-              FROM public.channel_members cm
-             WHERE cm.channel_id = NEW.channel_id
-               AND cm.member_id != NEW.user_id
-               AND cm.mute_in_app_notifications = false
-               AND cm.notif_state != 'MUTED'
-        LOOP
-            -- Insert the notification for each eligible member
-            INSERT INTO public.notifications (
-                receiver_user_id,
-                sender_user_id,
-                type,
-                message_id,
-                channel_id,
-                message_preview,
-                created_at
-            )
-            VALUES (
-                channel_member_id,
-                NEW.user_id,
-                'channel_event',
-                NEW.id,
-                NEW.channel_id,
-                truncated_content,
-                timezone('utc', now())
-            );
-        END LOOP;
-    END IF;
+    -- 4) Loop over channel members (excluding sender) who have not muted notifications
+    FOR channel_member_id IN
+        SELECT cm.member_id
+          FROM public.channel_members cm
+         WHERE cm.channel_id = NEW.channel_id
+           AND cm.member_id != NEW.user_id
+           AND cm.mute_in_app_notifications = false
+           AND cm.notif_state != 'MUTED'
+    LOOP
+        -- Insert the notification for each eligible member
+        INSERT INTO public.notifications (
+            receiver_user_id,
+            sender_user_id,
+            type,
+            message_id,
+            channel_id,
+            message_preview,
+            created_at
+        )
+        VALUES (
+            channel_member_id,
+            NEW.user_id,
+            'channel_event',
+            NEW.id,
+            NEW.channel_id,
+            truncated_content,
+            timezone('utc', now())
+        );
+    END LOOP;
 
     RETURN NEW;
 END;
@@ -261,18 +250,18 @@ $$;
 COMMENT ON FUNCTION create_everyone_notifications() IS 'Creates notifications for all channel members when @everyone is used in a message.';
 
 -- Trigger: create_everyone_notifications
--- Tokenised match — must mirror the IF inside the function body.
+-- Tokenised match: `@everyoneElse` and `x@everyone` do not fire this trigger.
 DROP TRIGGER IF EXISTS create_everyone_notifications ON public.messages;
 CREATE TRIGGER create_everyone_notifications
 AFTER INSERT ON public.messages
 FOR EACH ROW
-WHEN (NEW.content ~ '(^|[^a-z0-9_-])@everyone($|[^a-z0-9_-])' AND NEW.type IS DISTINCT FROM 'notification')
+WHEN (NEW.content ~ '(^|[^A-Za-z0-9_-])@everyone($|[^A-Za-z0-9_-])' AND NEW.type IS DISTINCT FROM 'notification')
 EXECUTE FUNCTION create_everyone_notifications();
 
 COMMENT ON TRIGGER create_everyone_notifications ON public.messages IS 'Creates notifications for all channel members when @everyone is used.';
 
--- Notifies offline, ALL-state, non-muted channel members for plain (no
--- mention / no @everyone) messages. Trigger predicate filters the rest.
+-- Notifies offline, ALL-state, non-muted channel members for messages with no
+-- @everyone and no @ token that names another channel member.
 CREATE OR REPLACE FUNCTION create_regular_message_notifications()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -302,10 +291,22 @@ BEGIN
         RETURN NEW; -- Sender doesn't exist or is deleted
     END IF;
 
-    -- 3) Truncate message content for preview
+    -- 3) A token that names another member makes this a mention message.
+    --    Membership alone decides it: a muted member still counts.
+    IF EXISTS (
+        SELECT 1
+          FROM regexp_matches(NEW.content, '(?:^|[^A-Za-z0-9_-])@([A-Za-z0-9_-]+)', 'g') AS token_match
+          JOIN public.users u ON u.username = token_match[1]
+          JOIN public.channel_members cm ON cm.member_id = u.id AND cm.channel_id = NEW.channel_id
+         WHERE u.id <> NEW.user_id
+    ) THEN
+        RETURN NEW;
+    END IF;
+
+    -- 4) Truncate message content for preview
     truncated_content := message_content_preview(NEW.content, NEW.medias, NEW.type);
 
-    -- 4) Create notifications only for members whose notif_state = 'ALL' and who are not online or the sender
+    -- 5) Create notifications only for members whose notif_state = 'ALL' and who are not online or the sender
     INSERT INTO public.notifications (
         receiver_user_id,
         sender_user_id,
@@ -340,20 +341,16 @@ $$;
 COMMENT ON FUNCTION create_regular_message_notifications() IS 'Creates notifications for regular messages based on user notification preferences.';
 
 -- Trigger: create_regular_message_notifications
--- Fire only on messages that contain NO @user mention and NO @everyone.
--- Original predicate `(... NOT LIKE '%@%' OR ... NOT LIKE '%@everyone%')`
--- is true for nearly every string containing '@' (any @user that isn't
--- exactly @everyone) and produced duplicate inbox rows alongside the
--- mention/reply/everyone notification creators. Use a regex that matches
--- either pattern and negate with `!~`.
+-- A WHEN clause cannot hold a subquery, so it skips only @everyone here.
+-- The function body skips a message whose token names another channel member.
 DROP TRIGGER IF EXISTS create_regular_message_notifications ON public.messages;
 CREATE TRIGGER create_regular_message_notifications
 AFTER INSERT ON public.messages
 FOR EACH ROW
-WHEN (NEW.content !~ '@[A-Za-z0-9_]+|@everyone' AND NEW.type IS DISTINCT FROM 'notification')
+WHEN (NEW.content !~ '(^|[^A-Za-z0-9_-])@everyone($|[^A-Za-z0-9_-])' AND NEW.type IS DISTINCT FROM 'notification')
 EXECUTE FUNCTION create_regular_message_notifications();
 
-COMMENT ON TRIGGER create_regular_message_notifications ON public.messages IS 'Creates notifications for regular messages that contain no @mention and no @everyone.';
+COMMENT ON TRIGGER create_regular_message_notifications ON public.messages IS 'Creates notifications for messages with no @everyone and no @token that names another channel member.';
 
 -- Reactions are high-signal: always notify the message owner per new
 -- reaction entry, regardless of notif_state. Channel mute still applies.
