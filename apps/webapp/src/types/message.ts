@@ -20,4 +20,8 @@ export type MessageMediaItem = {
   height?: number
   /** When true, feed blurs image until the viewer taps to reveal. */
   spoiler?: boolean
+  /** Audio length in seconds (upload-time best-effort). */
+  duration?: number
+  /** Audio peak levels, 0–100, one per player bar (upload-time best-effort). */
+  waveform?: number[]
 }

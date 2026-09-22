@@ -1,5 +1,6 @@
 import type { MessageMediaItem, MessageMediaKind } from '@types'
 
+import { parseAudioShape } from './chatAudio'
 import { CHAT_MEDIA_ACCEPT, inferMessageMediaKindFromExtension } from './chatMediaMime'
 
 export { CHAT_MEDIA_ACCEPT }
@@ -75,7 +76,8 @@ export const messageMediasForInsert = (medias: MessageMediaItem[]): MessageMedia
       ...(media.name ? { name: media.name } : {}),
       ...(media.size != null ? { size: media.size } : {}),
       ...(dims ? { width: dims.width, height: dims.height } : {}),
-      ...(media.spoiler ? { spoiler: true } : {})
+      ...(media.spoiler ? { spoiler: true } : {}),
+      ...parseAudioShape(media)
     }
   })
 
@@ -135,6 +137,7 @@ export const parseMessageMedias = (raw: unknown): MessageMediaItem[] => {
     if (record.spoiler === true) {
       parsed.spoiler = true
     }
+    Object.assign(parsed, parseAudioShape(record))
     medias.push(parsed)
   }
 

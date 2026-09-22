@@ -134,6 +134,15 @@ const EXTENSION_MIME: Record<string, string> = {
   zip: 'application/zip'
 }
 
+/** First extension mapped to this MIME, else its subtype: `audio/mp4` → `m4a`, `audio/webm;codecs=opus` → `webm`. */
+export const extensionForMime = (mime: string): string => {
+  const base = mime.split(';')[0].trim().toLowerCase()
+  return (
+    Object.keys(EXTENSION_MIME).find((ext) => EXTENSION_MIME[ext] === base) ??
+    (base.split('/')[1] || 'bin')
+  )
+}
+
 const extensionFromName = (name: string): string | null => {
   if (!name.includes('.')) return null
   const ext = name.split('.').pop()?.trim().toLowerCase()
@@ -143,10 +152,7 @@ const extensionFromName = (name: string): string | null => {
 export const chatMediaStorageExtension = (file: File): string => {
   const fromName = extensionFromName(file.name)
   if (fromName) return fromName === 'jpeg' ? 'jpg' : fromName
-
-  const subtype = file.type.split('/')[1]
-  if (!subtype) return 'bin'
-  return subtype === 'jpeg' ? 'jpg' : subtype
+  return extensionForMime(file.type)
 }
 
 export const inferMessageMediaKindFromExtension = (fileName: string): MessageMediaKind | null => {

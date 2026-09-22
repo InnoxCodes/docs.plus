@@ -1,6 +1,7 @@
 import { removeFileFromStorage, uploadFileToStorageWithProgress } from '@api'
 import type { MessageMediaItem } from '@types'
 
+import { isVoiceNoteName, readAudioShape } from './chatAudio'
 import { chatMediaStorageExtension, resolveChatMediaMime } from './chatMediaMime'
 import {
   CHAT_MEDIA_BUCKET,
@@ -81,6 +82,16 @@ async function readUploadMediaDims(
   return null
 }
 
+/** Upload-time metadata: pixel size for images and video, length and peaks for a voice note. */
+async function readUploadMediaMeta(
+  file: File,
+  kind: MessageMediaItem['type']
+): Promise<Partial<MessageMediaItem>> {
+  if (kind === 'image' || kind === 'video') return (await readUploadMediaDims(file, kind)) ?? {}
+  if (kind === 'audio' && isVoiceNoteName(file.name)) return (await readAudioShape(file)) ?? {}
+  return {}
+}
+
 export async function uploadChatMedia(
   file: File,
   userId: string,
@@ -94,11 +105,10 @@ export async function uploadChatMedia(
   const type = inferMessageMediaKind(file)
   const storagePath = `${userId}/${channelId}/${crypto.randomUUID()}.${chatMediaStorageExtension(file)}`
   const contentType = resolveChatMediaMime(file) || undefined
-  const shouldReadDims = type === 'image' || type === 'video'
 
-  const [{ error }, dims] = await Promise.all([
+  const [{ error }, meta] = await Promise.all([
     uploadFileToStorageWithProgress(CHAT_MEDIA_BUCKET, storagePath, file, contentType, options),
-    shouldReadDims ? readUploadMediaDims(file, type) : Promise.resolve(null)
+    readUploadMediaMeta(file, type)
   ])
 
   if (error) {
@@ -122,6 +132,6 @@ export async function uploadChatMedia(
     type,
     name: file.name,
     size: file.size,
-    ...(dims ? { width: dims.width, height: dims.height } : {})
+    ...meta
   }
 }

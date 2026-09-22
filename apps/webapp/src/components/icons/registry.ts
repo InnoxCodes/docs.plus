@@ -69,6 +69,7 @@ import {
   LuMoon,
   LuMusic,
   LuPanelLeft,
+  LuPause,
   LuPencil,
   LuPenOff,
   LuPhone,
@@ -185,6 +186,7 @@ export const Icons = {
   phone: LuPhone,
   video: LuVideo,
   play: LuPlay,
+  pause: LuPause,
   maximize2: LuMaximize2,
 
   calendar: LuCalendar,
