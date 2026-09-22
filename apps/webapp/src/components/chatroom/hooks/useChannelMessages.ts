@@ -92,7 +92,9 @@ export const useChannelMessages = ({
         .map((m) => m.seq)
         .filter((s): s is number => s != null)
       oldestSeqRef.current = seqs.length ? Math.min(...seqs) : null
-      newestSeqRef.current = seqs.length ? Math.max(...seqs) : null
+      // 0, not null: null means "window not loaded", and the realtime drain waits on it.
+      // With null, the first echo in an empty chat never merged, so the send stayed pending.
+      newestSeqRef.current = seqs.length ? Math.max(...seqs) : 0
       setHasMoreOlder(Boolean(win.has_more_before))
       dataIncludesTailRef.current = mediaOnly ? true : !win.has_more_after
       // Virtuoso mounts in a later commit than the Provider's effect. When
