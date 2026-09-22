@@ -1,3 +1,4 @@
+import { voiceNoteFileName } from '@components/chatroom/utils/chatAudio'
 import * as toast from '@components/toast'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
@@ -246,7 +247,7 @@ export function useVoiceRecorder({
             return
           }
 
-          const file = new File([blob], `voice-${Date.now()}.webm`, { type: mimeType })
+          const file = new File([blob], voiceNoteFileName(mimeType), { type: mimeType })
           revokePreview()
           const url = URL.createObjectURL(blob)
           setPreviewFile(file)
