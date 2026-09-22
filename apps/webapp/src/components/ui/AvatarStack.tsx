@@ -12,7 +12,13 @@ import {
 } from '@utils/avatarStackGeometry'
 import { twMerge } from 'tailwind-merge'
 
-import { Avatar } from './Avatar'
+import { Avatar, type AvatarActivity } from './Avatar'
+
+const ACTIVITY_TOOLTIPS: Record<AvatarActivity, string> = {
+  typing: 'is typing',
+  choosingEmoji: 'is choosing an emoji',
+  recordingVoice: 'is recording a voice note'
+}
 
 export interface AvatarStackProps {
   users?: FaceSource[]
@@ -25,8 +31,8 @@ export interface AvatarStackProps {
   totalCount?: number
   /** Which edge stays put as the stack grows. */
   anchor?: AvatarStackAnchor
-  /** Bounce faces whose owner is currently typing. */
-  showTypingIndicator?: boolean
+  /** Show what each face is doing now: a chip for an activity, else the typing bounce. */
+  showActivity?: boolean
   clickable?: boolean
   tooltipPlacement?: Placement
   className?: string
@@ -39,7 +45,7 @@ export function AvatarStack({
   maxDisplay = 4,
   totalCount,
   anchor = 'left',
-  showTypingIndicator = false,
+  showActivity = false,
   clickable = true,
   tooltipPlacement = 'bottom',
   className
@@ -64,6 +70,15 @@ export function AvatarStack({
       )}>
       {visibleUsers.map((user, index) => {
         const { id, displayName } = resolveFace(user)
+        const name = displayName || 'Anonymous'
+        const typing = user.status === 'TYPING' ? 'typing' : undefined
+        const activity = showActivity ? (user.activity ?? typing) : undefined
+        // The chip sits top-right, so a chip face paints above the face on its right.
+        // Right anchor: that face comes earlier in the DOM, so a tie is already right.
+        let zIndex = anchorRight ? visibleUsers.length - index : undefined
+        if (activity && activity !== 'typing') {
+          zIndex = visibleUsers.length + 1 - (anchorRight ? 0 : index)
+        }
         return (
           <Avatar
             key={id ?? `face-${index}`}
@@ -71,11 +86,11 @@ export function AvatarStack({
             size={size}
             edge={edge}
             clickable={clickable}
-            isTyping={showTypingIndicator && user.status === 'TYPING'}
-            tooltip={displayName || 'Anonymous'}
+            activity={activity}
+            tooltip={activity ? `${name} ${ACTIVITY_TOOLTIPS[activity]}` : name}
             tooltipPlacement={tooltipPlacement}
             className="animate-badge-entry"
-            style={anchorRight ? { zIndex: visibleUsers.length - index } : undefined}
+            style={zIndex === undefined ? undefined : { zIndex }}
           />
         )
       })}
@@ -88,7 +103,7 @@ export function AvatarStack({
             avatarEdgeClass(edge)
           )}
           // The count is data, not a face: keep it above the pile in both anchors.
-          style={anchorRight ? { zIndex: visibleUsers.length + 1 } : undefined}>
+          style={{ zIndex: visibleUsers.length + 2 }}>
           <div
             className={twMerge(
               'bg-neutral text-neutral-content flex size-full items-center justify-center rounded-full font-semibold',

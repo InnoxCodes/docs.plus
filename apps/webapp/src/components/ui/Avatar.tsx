@@ -5,7 +5,9 @@ import Config from '@config'
 import { Avatar as DicebearAvatar, Style } from '@dicebear/core'
 import lorelei from '@dicebear/styles/lorelei.json' with { type: 'json' }
 import { Placement } from '@floating-ui/react'
+import { type IconName, Icons } from '@icons'
 import { useStore } from '@stores'
+import type { PresenceActivity } from '@types'
 import { type FaceSource, resolveFace } from '@utils/avatarFace'
 import {
   type AvatarEdge,
@@ -21,6 +23,11 @@ type AvatarImageSource = 'bucket' | 'remote' | 'fallback'
 
 const FALLBACK_SEED = 'avatar'
 
+const ACTIVITY_ICONS: Record<PresenceActivity, IconName> = {
+  choosingEmoji: 'emoji',
+  recordingVoice: 'mic'
+}
+
 // Style validates and clones the definition; reuse it so each seed skips a re-parse.
 const loreleiStyle = new Style(lorelei)
 
@@ -28,6 +35,8 @@ const createFallbackAvatarUri = (seed: string): string => {
   const svg = new DicebearAvatar(loreleiStyle, { seed }).toString()
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`
 }
+
+export type AvatarActivity = PresenceActivity | 'typing'
 
 export interface AvatarProps extends Omit<React.HTMLAttributes<HTMLElement>, 'children'> {
   /** The one identity input — profile, RPC row, or caret shape (`utils/avatarFace`). */
@@ -39,7 +48,8 @@ export interface AvatarProps extends Omit<React.HTMLAttributes<HTMLElement>, 'ch
   edge?: AvatarEdge
   /** Opt-in presence dot; omit to render none. */
   presence?: 'online' | 'offline'
-  isTyping?: boolean
+  /** One per face: `typing` bounces the face, an activity adds a corner chip. */
+  activity?: AvatarActivity
   /** Renders a button that opens the profile dialog. Needs a `face` id to activate. */
   clickable?: boolean
   tooltip?: string
@@ -53,7 +63,7 @@ export const Avatar = forwardRef<HTMLElement, AvatarProps>(function Avatar(
     size = 'md',
     edge = 'ring',
     presence,
-    isTyping = false,
+    activity,
     clickable = true,
     tooltip,
     tooltipPlacement,
@@ -109,7 +119,7 @@ export const Avatar = forwardRef<HTMLElement, AvatarProps>(function Avatar(
     // daisyUI clips `.avatar`; the presence dot and stack cutout paint outside the circle.
     '!overflow-visible',
     presence && (presence === 'online' ? 'avatar-online' : 'avatar-offline'),
-    isTyping && 'avatar-typing',
+    activity === 'typing' && 'avatar-typing',
     interactive
       ? 'focus-visible:ring-primary cursor-pointer focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:outline-none'
       : 'cursor-default',
@@ -129,6 +139,15 @@ export const Avatar = forwardRef<HTMLElement, AvatarProps>(function Avatar(
     />
   )
 
+  const ActivityIcon = activity && activity !== 'typing' ? Icons[ACTIVITY_ICONS[activity]] : null
+  const chip = ActivityIcon && (
+    <span
+      aria-hidden
+      className="avatar-activity bg-secondary text-secondary-content pointer-events-none absolute -top-0.5 -right-0.5 grid size-3.5 place-items-center rounded-full ring-2 ring-[var(--avatar-stack-edge,var(--color-base-100))]">
+      <ActivityIcon size={10} strokeWidth={2.5} />
+    </span>
+  )
+
   const root = interactive ? (
     <button
       {...restProps}
@@ -138,10 +157,12 @@ export const Avatar = forwardRef<HTMLElement, AvatarProps>(function Avatar(
       onClick={openProfile}
       className={rootClassName}>
       {image}
+      {chip}
     </button>
   ) : (
     <div {...restProps} ref={ref as Ref<HTMLDivElement>} className={rootClassName}>
       {image}
+      {chip}
     </div>
   )
 

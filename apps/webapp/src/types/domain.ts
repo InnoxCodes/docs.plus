@@ -25,9 +25,22 @@ export interface ProfileData {
   linkTree?: LinkItem[]
 }
 
+/** What a chat member is doing now, other than typing. */
+export type PresenceActivity = 'choosingEmoji' | 'recordingVoice'
+
+/** Payload of the `typingIndicator` workspace broadcast. Old clients ignore unknown types. */
+export type TypingIndicatorPayload = {
+  type: 'startTyping' | 'stopTyping' | 'startActivity' | 'stopActivity'
+  /** Set only on `startActivity` and `stopActivity`. */
+  activity?: PresenceActivity
+  user: { id: string }
+}
+
 export type Profile = Omit<Database['public']['Tables']['users']['Row'], 'profile_data'> & {
   profile_data?: ProfileData
   channelId?: string | null
+  /** Client-only, like `channelId`. Never put it in `status`: that is the Postgres enum `user_status`. */
+  activity?: PresenceActivity
   display_name?: string | null
   avatar_url?: string | null
   fullname?: string | null

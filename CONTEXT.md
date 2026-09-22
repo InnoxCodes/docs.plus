@@ -93,6 +93,7 @@ Shared names for docs.plus domain concepts. Architecture reviews and deepenings 
 - **presenceSync** — broadcast of `{id,channelId}` rows only (`workspacePresenceSync.ts`). Never creates face-less stub Profiles; attaches `channelId` to existing rows or buffers until a full track/broadcast profile arrives. Buffers die with the subscription (`clearPresenceSyncBuffers` via `clearAllPresenceShareTimers` on resubscribe).
 - **selectPresenceOthers** — filter self out of presence stacks (`PresentUsers`, `usePresentUsers`); pass `map.values()` or a channel list.
 - Avatar stacks never render stub-only id/`channelId` rows.
+- **Activity** — what a chat member does now, other than typing: `choosingEmoji` or `recordingVoice` (`PresenceActivity`). It lives in client-only `Profile.activity`. An **activity chip** shows it on the avatar, one activity per face. _Avoid_: status (the Postgres enum `user_status`), typing.
 
 ## Document swarm
 

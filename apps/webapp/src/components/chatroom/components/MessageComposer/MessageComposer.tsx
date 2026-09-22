@@ -21,6 +21,8 @@ import {
   ComposerAttachmentActionsContext
 } from './context/ComposerAttachmentActionsContext'
 import { MessageComposerContext } from './context/MessageComposerContext'
+import { isComposerInsertEmojiPickerOpen } from './helpers/dismissComposerOverlays'
+import { startComposerActivity, stopComposerActivity } from './helpers/handleTypingIndicator'
 import { useComposerAttachmentLifecycle } from './hooks/useComposerAttachmentLifecycle'
 import { useComposerAttachments } from './hooks/useComposerAttachments'
 import { useComposerDraft } from './hooks/useComposerDraft'
@@ -43,6 +45,11 @@ const MessageComposer = ({
   const [showFormattingToolbar, setShowFormattingToolbar] = useState(false)
   const setOrUpdateChatRoom = useChatStore((state) => state.setOrUpdateChatRoom)
   const focusRequest = useChatStore((state) => state.chatRoom.composerFocusRequest)
+  const isEmojiPickerOpen = useChatStore((state) =>
+    isComposerInsertEmojiPickerOpen(state.emojiPicker)
+  )
+  const isEmojiPanelOpen = useComposerEmojiPanelStore((state) => state.isOpen)
+  const choosingEmoji = isMobile ? isEmojiPanelOpen : isEmojiPickerOpen
 
   const setEditMsgMemory = useChatStore((state) => state.setEditMessageMemory)
   const setReplyMsgMemory = useChatStore((state) => state.setReplyMessageMemory)
@@ -183,6 +190,13 @@ const MessageComposer = ({
       window.removeEventListener('popstate', onPopState)
     }
   }, [editor, isMobile])
+
+  // Reaction pickers never send: the selectors above read the composer emoji UI only.
+  useEffect(() => {
+    if (!choosingEmoji) return
+    startComposerActivity('choosingEmoji')
+    return () => stopComposerActivity('choosingEmoji')
+  }, [choosingEmoji])
 
   const toggleToolbar = useCallback(() => {
     setShowFormattingToolbar((prev) => {

@@ -1,7 +1,8 @@
 import * as toast from '@components/toast'
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { dismissComposerOverlaysBeforeVoice } from '../helpers/dismissComposerOverlays'
+import { startComposerActivity, stopComposerActivity } from '../helpers/handleTypingIndicator'
 
 const MAX_RECORD_MS = 5 * 60 * 1000
 const CANCEL_THRESHOLD_PX = 80
@@ -59,6 +60,13 @@ export function useVoiceRecorder({
   // A release or a cleanup during the microphone request changes this id.
   // The pending start then stops its stream and does not record.
   const startIdRef = useRef(0)
+
+  // Held or locked. Preview, cancel, and the 5-minute cap all leave this phase.
+  useEffect(() => {
+    if (phase !== 'recording') return
+    startComposerActivity('recordingVoice')
+    return () => stopComposerActivity('recordingVoice')
+  }, [phase])
 
   const clearTimers = useCallback(() => {
     if (stopTimerRef.current != null) {

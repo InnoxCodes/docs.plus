@@ -710,9 +710,17 @@ html:not(.m_mobile) {
   animation: avatar-typing 0.8s ease-in-out infinite;
 }
 
+/* Activity chip: pop in, then 6 bounces (4.8 s, under the WCAG 2.2.2 5 s line), then rest. */
+.avatar-activity {
+  animation:
+    badge-entry 200ms ease-out backwards,
+    avatar-typing 0.8s ease-in-out 200ms 6;
+}
+
 /* Decorative infinite loops stop under reduced motion; .loading spinners stay (status). */
 @media (prefers-reduced-motion: reduce) {
   .avatar-typing,
+  .avatar-activity,
   .border-ping-glow {
     animation: none;
   }

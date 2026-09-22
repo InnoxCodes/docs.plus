@@ -1,4 +1,4 @@
-import { Profile as TProfile } from '@types'
+import { type PresenceActivity, Profile as TProfile } from '@types'
 import { immer } from 'zustand/middleware/immer'
 
 type UserStatus = 'ONLINE' | 'OFFLINE' | 'AWAY' | 'BUSY' | 'INVISIBLE' | 'TYPING'
@@ -7,6 +7,7 @@ interface IUsersPresenceStore {
   usersPresence: Map<string, TProfile>
   setOrUpdateUserPresence: (userId: string, userData: TProfile) => void
   updateUserStatus: (userId: string, status: UserStatus) => void
+  setUserActivity: (userId: string, activity?: PresenceActivity) => void
   /** Reset the map — used when swapping realtime subscriptions (e.g. anon→authed). */
   clearUsersPresence: () => void
 }
@@ -30,6 +31,17 @@ const usersPresence = immer<IUsersPresenceStore>((set) => ({
       if (!user) return
       const next = new Map(state.usersPresence)
       next.set(userId, { ...user, status })
+      state.usersPresence = next
+    })
+  },
+
+  // Keepalives resend the same value every 3 s; skip those writes.
+  setUserActivity: (userId, activity) => {
+    set((state) => {
+      const user = state.usersPresence.get(userId)
+      if (!user || user.activity === activity) return
+      const next = new Map(state.usersPresence)
+      next.set(userId, { ...user, activity })
       state.usersPresence = next
     })
   },

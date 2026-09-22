@@ -69,7 +69,7 @@ export function TocRowTrail({
           size="sm"
           surface="well"
           users={presentUsers}
-          showTypingIndicator
+          showActivity
           anchor="right"
           tooltipPlacement="left"
         />

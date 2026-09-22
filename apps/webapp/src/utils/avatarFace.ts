@@ -1,3 +1,5 @@
+import type { PresenceActivity } from '@types'
+
 /** Loose profile / RPC / caret shapes — snake_case preferred, camelCase accepted. */
 export type FaceSource = {
   id?: string
@@ -12,6 +14,7 @@ export type FaceSource = {
   username?: string | null
   email?: string | null
   status?: string | null
+  activity?: PresenceActivity
 }
 
 export type ResolvedFace = {
